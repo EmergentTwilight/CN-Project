@@ -1,4 +1,11 @@
-ns-3.46.1/
-CLAUDE.md
+.vscode/
+
 *.tar*
 *.pdf
+
+ns-3.46.1/*
+!ns-3.46.1/src/
+!ns-3.46.1/scratch/
+
+CLAUDE.md
+.claude/
