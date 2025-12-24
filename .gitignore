@@ -9,3 +9,6 @@ ns-3.46.1/*
 
 CLAUDE.md
 .claude/
+
+tmp/
+temp/
