@@ -44,7 +44,11 @@ BlockHeap 使用两个块序列 D0 和 D1：
   - t = ⌊log^(2/3)(n)⌋
   - 层数 l = ⌈log(n)/t⌉
 
-### 3. 验证程序 (`verify.cpp`)
+### 3. OJ 提交版本 (`oj.cpp`)
+
+单文件实现，包含完整的 BlockHeap（带 D0/D1）和 BMSSP 算法，用于在线评测系统提交。
+
+### 4. 验证程序 (`verify.cpp`)
 
 包含完整的测试框架：
 
@@ -65,33 +69,48 @@ BlockHeap 使用两个块序列 D0 和 D1：
 make
 ```
 
-或直接使用 g++：
-
-```bash
-g++ -std=c++17 -O2 -Wall -o verify verify.cpp bmssp.cpp
-```
-
 ### 运行测试
 
 ```bash
-# 默认参数：100个测试，最大顶点数50，最大边权100
+# 默认测试：100个测试，最大顶点数50，最大边权100，稀疏图
 make test
 
-# 快速测试：10个测试，最大顶点数20，最大边权50
-make test-quick
+# 快速测试：10个测试，小规模稀疏图
+make quick
 
-# 完整测试：500个测试，最大顶点数100，最大边权500
-make test-full
+# 稀疏图测试：edge_factor = 10
+make sparse
 
-# 自定义参数
-./verify <测试数> <最大顶点数> <最大边权>
+# 稠密图测试：edge_factor = 1000
+make dense
+
+# 自定义参数（可覆盖任意参数）
+make test NUM_TESTS=200 MAX_N=100 MAX_WEIGHT=500 EDGE_FACTOR=50
 ```
+
+### 直接运行 verify 程序
+
+```bash
+./verify <测试数> <最大顶点数> <最大边权> <边因子>
+```
+
+参数说明：
+- **测试数**: 运行的测试用例数量
+- **最大顶点数**: 随机图的最大顶点数
+- **最大边权**: 随机边的最大权重
+- **边因子**: 控制图稠密程度，max_m ≈ max_n × edge_factor
+  - 10: 稀疏图
+  - 100: 中等稀疏图（默认）
+  - 1000: 稠密图
 
 ### 示例
 
 ```bash
-# 运行200个测试，最大顶点数100，最大边权500
-./verify 200 100 500
+# 运行200个测试，最大顶点数100，最大边权500，稀疏图
+make test NUM_TESTS=200 MAX_N=100 MAX_WEIGHT=500 EDGE_FACTOR=10
+
+# 或直接调用
+./verify 200 100 500 10
 ```
 
 ## 测试结果
@@ -108,11 +127,15 @@ make test-full
 
 ```
 breaking/
-├── bmssp.h          # BlockHeap 数据结构和 BMSSP 函数声明
-├── bmssp.cpp        # BMSSP 算法实现（FindPivots, BaseCase, BMSSP）
-├── verify.cpp       # 验证程序，包含 Dijkstra 和测试框架
+├── .clang-format    # 代码格式化配置
+├── .clang-tidy      # 静态分析配置
+├── .editorconfig    # 编辑器配置
 ├── Makefile         # 构建文件
-└── README.md        # 本文档
+├── README.md        # 本文档
+├── bmssp.cpp        # BMSSP 算法实现（模块化）
+├── bmssp.h          # BlockHeap 数据结构定义
+├── oj.cpp           # OJ 提交版本（单文件）
+└── verify.cpp       # 验证程序（与 Dijkstra 对比）
 ```
 
 ## 算法复杂度
@@ -127,6 +150,12 @@ breaking/
 2. **前沿缩减**: 通过 FindPivots 减少需要处理的顶点数量
 3. **部分排序**: BlockHeap 只需要部分排序，而非完全排序
 4. **跨层次边重用**: 使用 `<=` 松弛条件确保下层松弛的边可被上层重用
+
+## 代码格式化
+
+```bash
+make format
+```
 
 ## 参考文献
 

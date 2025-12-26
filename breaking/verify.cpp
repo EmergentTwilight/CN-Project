@@ -12,13 +12,14 @@
 // ============ Graph Structure ============
 int n, m, s;
 int num_edge;
-int head[1000005];
+static int head[5000005];
 
 struct Edge
 {
     Vertex to;
     int weight, next;
-} edge[1000005];
+};
+static Edge edge[5000005];
 
 void
 add_edge(const int& u, const int& v, const int& w)
@@ -82,10 +83,10 @@ int n;
 int k = 1;
 int t = 1;
 int l = 1;
-Length dis[1000005];
+Length dis[5000005];
 int num_edge;
-int head[1000005];
-Edge edge[1000005];
+int head[5000005];
+Edge edge[5000005];
 } // namespace BMSSP
 
 // ============ Random Graph Generator ============
@@ -234,11 +235,11 @@ class RandomGraphGenerator
 };
 
 // ============ Verifier ============
+// Large array must be static to avoid stack overflow
+static Length dijkstra_dis[5000005];
+
 class Verifier
 {
-  private:
-    Length dijkstra_dis[1000005];
-
   public:
     bool verify(int test_case)
     {
@@ -346,10 +347,17 @@ main(int argc, char* argv[])
         max_weight = std::atoi(argv[3]);
     }
 
+    // Edge factor for controlling graph density (default: 100 for sparse graphs)
+    int edge_factor = 100;
+    if (argc >= 5)
+    {
+        edge_factor = std::atoi(argv[4]);
+    }
+
     printf("========================================\n");
     printf("BMSSP Verification against Dijkstra\n");
     printf("========================================\n");
-    printf("Tests: %d, Max n: %d, Max weight: %d\n\n", num_tests, max_n, max_weight);
+    printf("Tests: %d, Max n: %d, Max weight: %d, Edge factor: %d\n\n", num_tests, max_n, max_weight, edge_factor);
 
     int passed = 0;
     int failed = 0;
@@ -392,9 +400,9 @@ main(int argc, char* argv[])
             if (type_name == "Random Connected")
             {
                 cur_n = 3 + gen.rand_int(0, max_n - 3);
-                // Limit edges: use max_n * 10 as a reasonable upper bound instead of n^2/2
+                // Limit edges based on edge_factor parameter
                 int max_possible = (cur_n * (cur_n - 1) / 2) - (cur_n - 1);
-                int max_m = std::min(max_n * 10, max_possible); // Much smaller limit
+                int max_m = std::min(max_n * edge_factor, max_possible);
                 cur_m = (cur_n - 1) + gen.rand_int(0, max_m);
                 gen.generate_random_connected(cur_n, cur_m, max_weight, edges);
             }

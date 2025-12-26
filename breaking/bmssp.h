@@ -252,6 +252,8 @@ class BlockHeapDS
     }
 
     // Find median of a linked list and partition
+    // Returns: second half of nodes (these will be moved to a new block)
+    // Uses nth_element for O(n) average time complexity (as mentioned in paper)
     std::vector<Node<K, V>*> FindMedianAndPartition(Block<K, V>* block)
     {
         std::vector<Node<K, V>*> nodes;
@@ -267,8 +269,20 @@ class BlockHeapDS
             return nodes;
         }
 
-        // Sort by value (and key for ties)
-        std::sort(nodes.begin(), nodes.end(), [](const Node<K, V>* a, const Node<K, V>* b) {
+        // Find median using nth_element (O(n) average, as mentioned in paper)
+        size_t mid = nodes.size() / 2;
+        std::nth_element(nodes.begin(), nodes.begin() + mid, nodes.end(),
+            [](const Node<K, V>* a, const Node<K, V>* b) {
+                if (a->value != b->value)
+                {
+                    return a->value < b->value;
+                }
+                return a->key < b->key;
+            });
+
+        // Now partition into first half (<= median) and second half (> median)
+        // First sort just the first half to maintain order within the block
+        std::sort(nodes.begin(), nodes.begin() + mid, [](const Node<K, V>* a, const Node<K, V>* b) {
             if (a->value != b->value)
             {
                 return a->value < b->value;
@@ -276,23 +290,15 @@ class BlockHeapDS
             return a->key < b->key;
         });
 
-        // Find median
-        size_t mid = nodes.size() / 2;
-
-        // Partition: first half goes to first block, rest to second
-        std::vector<Node<K, V>*> secondHalf;
-
-        for (size_t i = 0; i < nodes.size(); i++)
-        {
-            if (i < mid)
+        // Collect second half and sort it too
+        std::vector<Node<K, V>*> secondHalf(nodes.begin() + mid, nodes.end());
+        std::sort(secondHalf.begin(), secondHalf.end(), [](const Node<K, V>* a, const Node<K, V>* b) {
+            if (a->value != b->value)
             {
-                // Stays in first block
+                return a->value < b->value;
             }
-            else
-            {
-                secondHalf.push_back(nodes[i]);
-            }
-        }
+            return a->key < b->key;
+        });
 
         // Rebuild block with first half
         block->head = nullptr;
@@ -343,9 +349,10 @@ class BlockHeapDS
         // Partition and get nodes for second block
         std::vector<Node<K, V>*> secondHalfNodes = FindMedianAndPartition(block);
 
-        // Create new block with second half
+        // Create new block with second half - this new block will own these nodes
         Block<K, V>* newBlock = new Block<K, V>();
         newBlock->upperBound = block->upperBound;
+        // owns_nodes is true by default, which is correct for the new block
 
         for (auto* node : secondHalfNodes)
         {
@@ -476,19 +483,20 @@ class BlockHeapDS
         // Handle duplicates and partition into blocks
         std::vector<std::vector<std::pair<K, V>>> partitions;
         std::vector<std::pair<K, V>> currentPartition;
-        std::set<K> seenKeys;
+        std::unordered_set<K> seenKeys;
 
         for (const auto& kv : sortedL)
         {
             K key = kv.first;
             V value = kv.second;
 
-            if (seenKeys.count(key))
+            // Skip duplicate keys in this batch
+            if (!seenKeys.insert(key).second)
             {
                 continue;
             }
-            seenKeys.insert(key);
 
+            // Check if existing value is better
             auto it = keyToNode.find(key);
             if (it != keyToNode.end() && value >= it->second->value)
             {
@@ -501,6 +509,7 @@ class BlockHeapDS
             {
                 partitions.push_back(currentPartition);
                 currentPartition.clear();
+                seenKeys.clear();
             }
         }
 
@@ -509,7 +518,7 @@ class BlockHeapDS
             partitions.push_back(currentPartition);
         }
 
-        // Create blocks from partitions
+        // Create blocks from partitions (in reverse order to prepend)
         for (auto it = partitions.rbegin(); it != partitions.rend(); ++it)
         {
             Block<K, V>* newBlock = new Block<K, V>();
@@ -545,11 +554,79 @@ class BlockHeapDS
         }
     }
 
+    // Helper: Remove and delete a node from a specific block
+    // Returns true if the node was found and deleted
+    bool RemoveNodeFromBlock(Block<K, V>* block, Node<K, V>* node)
+    {
+        if (block->head == node)
+        {
+            block->head = node->next;
+            if (block->head)
+            {
+                block->head->prev = nullptr;
+            }
+            if (block->tail == node)
+            {
+                block->tail = nullptr;
+            }
+            block->size--;
+            delete node;
+            return true;
+        }
+
+        // Search in the middle of the list
+        Node<K, V>* curr = block->head;
+        while (curr && curr->next != node)
+        {
+            curr = curr->next;
+        }
+
+        if (curr && curr->next == node)
+        {
+            curr->next = node->next;
+            if (node->next)
+            {
+                node->next->prev = curr;
+            }
+            if (block->tail == node)
+            {
+                block->tail = curr;
+            }
+            block->size--;
+            delete node;
+            return true;
+        }
+
+        return false;
+    }
+
+    // Helper: Remove and delete a node from D0 or D1 blocks
+    void RemoveAndDeleteNode(Node<K, V>* node)
+    {
+        // Try D0 first
+        for (auto b : D0)
+        {
+            if (RemoveNodeFromBlock(b, node))
+            {
+                return;
+            }
+        }
+        // Then D1
+        for (auto b : D1)
+        {
+            if (RemoveNodeFromBlock(b, node))
+            {
+                return;
+            }
+        }
+    }
+
     // Pull() - Return up to M smallest keys with separating bound
     std::pair<std::vector<K>, V> Pull()
     {
         std::vector<K> result;
         std::vector<Node<K, V>*> toDelete;
+        std::unordered_set<Node<K, V>*> deleteSet; // For O(1) lookup
 
         // Collect elements from D0 and D1
         int collected = 0;
@@ -596,38 +673,18 @@ class BlockHeapDS
             for (auto node : collectedNodes)
             {
                 result.push_back(node->key);
-                toDelete.push_back(node);
             }
 
-            for (auto node : toDelete)
+            // Remove from keyToNode map first
+            for (auto node : collectedNodes)
             {
-                for (auto b : D0)
-                {
-                    Node<K, V>* curr = b->head;
-                    while (curr)
-                    {
-                        if (curr == node)
-                        {
-                            DeleteFromBlock(b, node);
-                            goto deleted;
-                        }
-                        curr = curr->next;
-                    }
-                }
-                for (auto b : D1)
-                {
-                    Node<K, V>* curr = b->head;
-                    while (curr)
-                    {
-                        if (curr == node)
-                        {
-                            DeleteFromBlock(b, node);
-                            goto deleted;
-                        }
-                        curr = curr->next;
-                    }
-                }
-            deleted:;
+                keyToNode.erase(node->key);
+            }
+
+            // Then remove from blocks and delete nodes
+            for (auto node : collectedNodes)
+            {
+                RemoveAndDeleteNode(node);
             }
 
             CleanEmptyBlocks();
@@ -649,9 +706,10 @@ class BlockHeapDS
         {
             result.push_back(collectedNodes[i]->key);
             toDelete.push_back(collectedNodes[i]);
+            deleteSet.insert(collectedNodes[i]);
         }
 
-        // Find smallest remaining value
+        // Find smallest remaining value BEFORE deleting
         V minRemaining = globalB;
         bool foundRemaining = false;
 
@@ -660,16 +718,7 @@ class BlockHeapDS
             Node<K, V>* curr = block->head;
             while (curr != nullptr)
             {
-                bool isDeleted = false;
-                for (auto delNode : toDelete)
-                {
-                    if (curr == delNode)
-                    {
-                        isDeleted = true;
-                        break;
-                    }
-                }
-                if (!isDeleted && curr->value < minRemaining)
+                if (deleteSet.find(curr) == deleteSet.end() && curr->value < minRemaining)
                 {
                     minRemaining = curr->value;
                     foundRemaining = true;
@@ -683,16 +732,7 @@ class BlockHeapDS
             Node<K, V>* curr = block->head;
             while (curr != nullptr)
             {
-                bool isDeleted = false;
-                for (auto delNode : toDelete)
-                {
-                    if (curr == delNode)
-                    {
-                        isDeleted = true;
-                        break;
-                    }
-                }
-                if (!isDeleted && curr->value < minRemaining)
+                if (deleteSet.find(curr) == deleteSet.end() && curr->value < minRemaining)
                 {
                     minRemaining = curr->value;
                     foundRemaining = true;
@@ -701,36 +741,16 @@ class BlockHeapDS
             }
         }
 
-        // Delete all pulled nodes
+        // Remove from keyToNode map first
         for (auto node : toDelete)
         {
-            for (auto b : D0)
-            {
-                Node<K, V>* curr = b->head;
-                while (curr)
-                {
-                    if (curr == node)
-                    {
-                        DeleteFromBlock(b, node);
-                        goto deleted2;
-                    }
-                    curr = curr->next;
-                }
-            }
-            for (auto b : D1)
-            {
-                Node<K, V>* curr = b->head;
-                while (curr)
-                {
-                    if (curr == node)
-                    {
-                        DeleteFromBlock(b, node);
-                        goto deleted2;
-                    }
-                    curr = curr->next;
-                }
-            }
-        deleted2:;
+            keyToNode.erase(node->key);
+        }
+
+        // Then remove from blocks and delete nodes
+        for (auto node : toDelete)
+        {
+            RemoveAndDeleteNode(node);
         }
 
         CleanEmptyBlocks();
