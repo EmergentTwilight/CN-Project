@@ -57,15 +57,77 @@
 
 ### 使用项目根目录的 Makefile（推荐）
 
-你也可以在项目根目录使用 Makefile：
+项目根目录提供了便捷的 Makefile，可以简化 NS-3 的配置、编译和运行流程。
+
+#### 快速开始
 
 ```sh
-# 编译并运行 benchmark
-make run PROGRAM=benchmark
+# 完整流程：配置、编译并运行 benchmark 测试
+make all
+```
 
-# 或者只编译
+#### 详细命令说明
+
+##### 1. 配置 NS-3
+首次使用或修改配置后需要运行：
+```sh
+make configure
+```
+这会执行 `./ns3 configure --enable-examples --enable-tests`
+
+##### 2. 编译项目
+```sh
 make build
 ```
+编译 NS-3 及其所有模块（包括 BMSSP 算法）。
+
+##### 3. 运行测试程序
+
+**运行默认的 benchmark 测试：**
+```sh
+make benchmark
+# 或使用别名
+make test
+```
+
+**运行其他测试程序：**
+```sh
+make run PROGRAM=your_test_name
+```
+注意：`PROGRAM` 参数不需要 `.cc` 扩展名，程序文件应位于 `ns-allinone-3.46.1/ns-3.46.1/scratch/` 目录下。
+
+**示例：**
+```sh
+# 运行 benchmark.cc
+make run PROGRAM=benchmark
+
+# 运行 large-grid-test.cc
+make run PROGRAM=large-grid-test
+```
+
+##### 4. 清理构建文件
+```sh
+make clean
+```
+清理 NS-3 的构建文件，释放磁盘空间。
+
+#### 添加新的测试程序
+
+1. 在 `ns-allinone-3.46.1/ns-3.46.1/scratch/` 目录下创建新的 `.cc` 文件
+2. 参考 `benchmark.cc` 的格式编写测试代码
+3. 运行：`make run PROGRAM=your_test_name`（不需要 `.cc` 扩展名）
+
+#### 命令总结
+
+| 命令 | 说明 |
+|------|------|
+| `make all` | 执行完整流程：configure → build → benchmark |
+| `make configure` | 配置 NS-3（启用 examples 和 tests） |
+| `make build` | 编译 NS-3 |
+| `make benchmark` | 运行 benchmark 测试 |
+| `make test` | benchmark 的别名 |
+| `make run PROGRAM=xxx` | 运行指定的测试程序 |
+| `make clean` | 清理构建文件 |
 
 ### 关于 .gitignore
 
