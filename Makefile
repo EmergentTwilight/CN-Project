@@ -58,7 +58,7 @@ breaking:
 	cd $(NS3_DIR) && sed -i 's/m_useBmssp(false)/m_useBmssp(true)/g' src/internet/model/global-route-manager-impl.cc
 	cd $(NS3_DIR) && for f in scratch/test-*.cc; do sed -i 's/result\.algorithm = "Dijkstra"/result.algorithm = "Breaking"/g' $$f; done
 	@echo "Building..."
-	cd $(NS3_DIR) && ./ns3 build >/dev/null 2>&1
+	cd $(NS3_DIR) && ./ns3 build -j 10
 	@echo "breaking" > $(ALG_STATE_FILE)
 	@echo "✓ Built with Breaking algorithm"
 	@echo "  Now run: make test-correctness"
@@ -71,7 +71,7 @@ dijkstra:
 	cd $(NS3_DIR) && sed -i 's/m_useBmssp(true)/m_useBmssp(false)/g' src/internet/model/global-route-manager-impl.cc
 	cd $(NS3_DIR) && for f in scratch/test-*.cc; do sed -i 's/result\.algorithm = "Breaking"/result.algorithm = "Dijkstra"/g' $$f; done
 	@echo "Building..."
-	cd $(NS3_DIR) && ./ns3 build >/dev/null 2>&1
+	cd $(NS3_DIR) && ./ns3 build -j 10
 	@echo "dijkstra" > $(ALG_STATE_FILE)
 	@echo "✓ Built with Dijkstra algorithm"
 	@echo "  Now run: make test-correctness"
@@ -116,11 +116,11 @@ test-scalability: setup-results
 	@echo "Running Scalability Tests (Experiment 2)"
 	@echo "================================================================"
 	@cd $(NS3_DIR) && ./ns3 run --no-build test-scalability 2>/dev/null
-	@if [ -f $(NS3_DIR)/test-scalability-2-results.csv ]; then \
-		ALG=$$(head -1 $(NS3_DIR)/test-scalability-2-results.csv | grep -oP '(?<=Algorithm:)[^,]*' | head -1); \
+	@if [ -f $(NS3_DIR)/test-scalability-results.csv ]; then \
+		ALG=$$(head -1 $(NS3_DIR)/test-scalability-results.csv | grep -oP '(?<=Algorithm:)[^,]*' | head -1); \
 		if [ -z "$$ALG" ]; then ALG="$(CURRENT_ALG)"; fi; \
 		mkdir -p $(RESULTS_DIR)/$$ALG; \
-		mv $(NS3_DIR)/test-scalability-2-results.csv $(RESULTS_DIR)/$$ALG/test-scalability-results.csv; \
+		mv $(NS3_DIR)/test-scalability-results.csv $(RESULTS_DIR)/$$ALG/test-scalability-results.csv; \
 		echo "✓ Results: $(RESULTS_DIR)/$$ALG/test-scalability-results.csv"; \
 	fi
 
