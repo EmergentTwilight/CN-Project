@@ -7,8 +7,17 @@ ns-3.46.1/*
 !ns-3.46.1/src/
 !ns-3.46.1/scratch/
 
+build/
+cmake-cache/
+
 CLAUDE.md
 .claude/
 
 tmp/
 temp/
+
+# Test results
+results/
+# Algorithm state file
+.alg_state
+.lock-ns3_linux_build
