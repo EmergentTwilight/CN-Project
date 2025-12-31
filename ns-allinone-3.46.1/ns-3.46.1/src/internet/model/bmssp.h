@@ -120,6 +120,30 @@ class BlockHeapDS
     // Track total size for D1
     int D1TotalSize;
 
+    // Track minimum value of each block for O(1) min lookup
+    std::set<std::pair<V, int>> D0MinValues;  // (minValue, blockIndex) for D0
+    std::set<std::pair<V, int>> D1MinValues;  // (minValue, blockIndex) for D1
+
+    // Helper function to update block minimum
+    void UpdateBlockMin(BlockHeapBlock<K, V>* block, int blockIdx, bool isD0)
+    {
+        auto& minSet = isD0 ? D0MinValues : D1MinValues;
+
+        // Remove old entry if exists (any value with this blockIdx)
+        auto oldIt = minSet.lower_bound({std::numeric_limits<V>::lowest(), blockIdx});
+        if (oldIt != minSet.end() && oldIt->second == blockIdx)
+        {
+            minSet.erase(oldIt);
+        }
+
+        // Add new entry if block is non-empty
+        if (block && block->head)
+        {
+            // Find minimum value in this block (blocks are sorted, so head is min)
+            minSet.insert({block->head->value, blockIdx});
+        }
+    }
+
   public:
     BlockHeapDS(int m, V B, int n)
         : M(m),
@@ -148,6 +172,7 @@ class BlockHeapDS
         initBlock->upperBound = globalB;
         D1.push_back(initBlock);
         D1Bounds.insert({globalB, 0});
+        D1MinValues.insert({globalB, 0});  // Initial empty block has bound B
     }
 
     // Delete(key, value) - O(1) for deletion using node->block
@@ -182,6 +207,25 @@ class BlockHeapDS
         }
 
         block->size--;
+
+        // Update block minimum tracking (need to find block index)
+        // Find block in D1 (most common case for Delete)
+        auto it1 = std::find(D1.begin(), D1.end(), block);
+        if (it1 != D1.end())
+        {
+            int blockIdx = static_cast<int>(std::distance(D1.begin(), it1));
+            UpdateBlockMin(block, blockIdx, false);
+        }
+        else
+        {
+            // Check D0
+            auto it0 = std::find(D0.begin(), D0.end(), block);
+            if (it0 != D0.end())
+            {
+                int blockIdx = static_cast<int>(std::distance(D0.begin(), it0));
+                UpdateBlockMin(block, blockIdx, true);
+            }
+        }
 
         // Remove from keyToNode and delete
         keyToNode.erase(it);
@@ -428,6 +472,16 @@ class BlockHeapDS
 
         // Rebuild BST
         RebuildBoundsBST();
+
+        // Rebuild D1MinValues
+        D1MinValues.clear();
+        for (size_t i = 0; i < D1.size(); i++)
+        {
+            if (D1[i]->head)
+            {
+                D1MinValues.insert({D1[i]->head->value, static_cast<int>(i)});
+            }
+        }
     }
 
     // Rebuild the BST for D1 upper bounds
@@ -503,6 +557,9 @@ class BlockHeapDS
         {
             Split(targetBlockIdx);
         }
+
+        // Update block minimum tracking
+        UpdateBlockMin(block, targetBlockIdx, false);
     }
 
     // BatchPrepend(L)
@@ -592,6 +649,16 @@ class BlockHeapDS
             }
 
             D0.insert(D0.begin(), newBlock);
+        }
+
+        // Rebuild D0MinValues indices after insert
+        D0MinValues.clear();
+        for (size_t i = 0; i < D0.size(); i++)
+        {
+            if (D0[i]->head)
+            {
+                D0MinValues.insert({D0[i]->head->value, static_cast<int>(i)});
+            }
         }
     }
 
@@ -701,53 +768,82 @@ class BlockHeapDS
             toDelete.push_back(collectedNodes[i]);
         }
 
-        // Find smallest remaining value
+        // Find smallest remaining value using auxiliary sets
         V minRemaining = globalB;
         bool foundRemaining = false;
 
-        for (auto block : D0)
+        // Check D0 minimum first
+        if (!D0MinValues.empty())
         {
-            BlockHeapNode<K, V>* curr = block->head;
-            while (curr != nullptr)
+            minRemaining = D0MinValues.begin()->first;
+            foundRemaining = true;
+        }
+
+        // Check D1 minimum
+        if (!D1MinValues.empty())
+        {
+            V d1Min = D1MinValues.begin()->first;
+            if (!foundRemaining || d1Min < minRemaining)
             {
-                bool isDeleted = false;
-                for (auto delNode : toDelete)
-                {
-                    if (curr == delNode)
-                    {
-                        isDeleted = true;
-                        break;
-                    }
-                }
-                if (!isDeleted && curr->value < minRemaining)
-                {
-                    minRemaining = curr->value;
-                    foundRemaining = true;
-                }
-                curr = curr->next;
+                minRemaining = d1Min;
+                foundRemaining = true;
             }
         }
 
-        for (auto block : D1)
+        // Verify the minimum is not one of the deleted nodes
+        if (foundRemaining && !toDelete.empty())
         {
-            BlockHeapNode<K, V>* curr = block->head;
-            while (curr != nullptr)
+            std::unordered_set<BlockHeapNode<K, V>*> deletedSet(toDelete.begin(), toDelete.end());
+
+            // If minimum is deleted, find next minimum
+            // Check all blocks to find first non-deleted minimum
+            V actualMin = globalB;
+            bool foundActual = false;
+
+            for (auto block : D0)
             {
-                bool isDeleted = false;
-                for (auto delNode : toDelete)
+                BlockHeapNode<K, V>* curr = block->head;
+                while (curr)
                 {
-                    if (curr == delNode)
+                    if (deletedSet.find(curr) == deletedSet.end())
                     {
-                        isDeleted = true;
-                        break;
+                        if (!foundActual || curr->value < actualMin)
+                        {
+                            actualMin = curr->value;
+                            foundActual = true;
+                            break;
+                        }
                     }
+                    curr = curr->next;
                 }
-                if (!isDeleted && curr->value < minRemaining)
+                if (foundActual) break;
+            }
+
+            if (!foundActual)
+            {
+                for (auto block : D1)
                 {
-                    minRemaining = curr->value;
-                    foundRemaining = true;
+                    BlockHeapNode<K, V>* curr = block->head;
+                    while (curr)
+                    {
+                        if (deletedSet.find(curr) == deletedSet.end())
+                        {
+                            if (!foundActual || curr->value < actualMin)
+                            {
+                                actualMin = curr->value;
+                                foundActual = true;
+                                break;
+                            }
+                        }
+                        curr = curr->next;
+                    }
+                    if (foundActual) break;
                 }
-                curr = curr->next;
+            }
+
+            if (foundActual)
+            {
+                minRemaining = actualMin;
             }
         }
 
@@ -831,6 +927,25 @@ class BlockHeapDS
         if (!emptyBlockIdxs.empty())
         {
             RebuildBoundsBST();
+        }
+
+        // Rebuild min value sets
+        D0MinValues.clear();
+        for (size_t i = 0; i < D0.size(); i++)
+        {
+            if (D0[i]->head)
+            {
+                D0MinValues.insert({D0[i]->head->value, static_cast<int>(i)});
+            }
+        }
+
+        D1MinValues.clear();
+        for (size_t i = 0; i < D1.size(); i++)
+        {
+            if (D1[i]->head)
+            {
+                D1MinValues.insert({D1[i]->head->value, static_cast<int>(i)});
+            }
         }
     }
 

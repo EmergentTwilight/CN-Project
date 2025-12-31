@@ -1,0 +1,6 @@
+TestName,Topology,Nodes,Edges,Density,DensityLevel,Algorithm,Time_ms,Time_us,Speedup,NumRuns,StdDev_ms
+Exp3_1,Random,100,150,1.50,Sparse,Breaking,238.324,238324.0,1.00,10,10.214
+Exp3_2,Random,100,300,3.00,Medium,Breaking,536.937,536937.1,1.00,10,5.539
+Exp3_3,Random,100,500,5.00,Dense,Breaking,1064.006,1064005.9,1.00,10,3.927
+Exp3_4,Random,100,1000,10.00,VeryDense,Breaking,3090.578,3090578.5,1.00,10,9.430
+Exp3_5,Random,100,2000,20.00,UltraDense,Breaking,10613.390,10613389.5,1.00,1,0.000
