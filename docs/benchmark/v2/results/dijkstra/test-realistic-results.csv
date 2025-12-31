@@ -1,0 +1,4 @@
+TestName,Scenario,TopologyType,Nodes,Edges,Algorithm,Time_ms,Time_us,TimePerNode_us,NumRuns,StdDev_ms,Notes
+Exp5_1,DataCenter,Fat-Tree_k4,20,48,Dijkstra,17.356,17355.9,867.79,10,3.818,"k=4 Fat-Tree, typical small DC topology"
+Exp5_2,Campus,Hierarchical_3-Tier,27,31,Dijkstra,1.127,1126.8,41.73,10,0.039,"3-tier hierarchy: Core-Building-Floor"
+Exp5_3,ISP,High-Degree_Mesh,20,90,Dijkstra,34.261,34261.1,1713.06,10,0.410,"Mesh topology with degree=4"

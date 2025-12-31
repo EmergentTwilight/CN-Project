@@ -286,7 +286,8 @@ BmsspSolver::BaseCase(BmsspLength B, const VertexSet& S)
     pq.push({dis[x], x});
     inHeap.insert(x);
 
-    while (!pq.empty())
+    // Per Algorithm 2, line 7: while H is non-empty and |U_0| < k + 1
+    while (!pq.empty() && (int)U.size() < k + 1)
     {
         auto [d, u] = pq.top();
         pq.pop();
@@ -297,7 +298,7 @@ BmsspSolver::BaseCase(BmsspLength B, const VertexSet& S)
             continue;
         }
 
-        // Add u to U if not already there
+        // Add u to U if not already there (U_0 ← U_0 ∪ {u})
         bool alreadyInU = false;
         for (int v : U)
         {
@@ -312,7 +313,7 @@ BmsspSolver::BaseCase(BmsspLength B, const VertexSet& S)
             U.push_back(u);
         }
 
-        // Relax edges (per Algorithm 2, line 8)
+        // Relax edges (per Algorithm 2, line 10)
         // Condition: d[u] + w <= d[v] and d[u] + w < B
         for (int ei = head[u]; ei; ei = edge[ei].next)
         {

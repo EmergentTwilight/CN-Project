@@ -1,0 +1,4 @@
+TestName,Scenario,TopologyType,Nodes,Edges,Algorithm,Time_ms,Time_us,TimePerNode_us,NumRuns,StdDev_ms,Notes
+Exp5_1,DataCenter,Fat-Tree_k4,20,48,Breaking,3.621,3620.9,181.04,10,0.051,"k=4 Fat-Tree, typical small DC topology"
+Exp5_2,Campus,Hierarchical_3-Tier,27,31,Breaking,3.061,3060.6,113.36,10,0.067,"3-tier hierarchy: Core-Building-Floor"
+Exp5_3,ISP,High-Degree_Mesh,20,90,Breaking,5.911,5911.5,295.57,10,0.070,"Mesh topology with degree=4"

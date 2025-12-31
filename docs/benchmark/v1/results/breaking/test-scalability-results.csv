@@ -1,0 +1,4 @@
+TestName,Topology,Nodes,Edges,Density,Algorithm,Time_ms,Time_us,TimePerNode_us,Memory_kb
+Exp2_1,Grid5x5,25,40,1.60,Breaking,3.216,3215.8,128.63,0
+Exp2_2,Grid10x10,100,180,1.80,Breaking,678.009,678008.8,6780.09,0
+Exp2_3,Grid15x15,225,420,1.87,Breaking,794996.462,794996462.2,3533317.61,0

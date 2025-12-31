@@ -28,6 +28,8 @@
 #include <chrono>
 #include <iomanip>
 #include <cmath>
+#include <vector>
+#include <functional>
 
 using namespace ns3;
 
@@ -48,6 +50,8 @@ struct RealisticResult
     double time_us;
     double time_per_node_us;
     std::string notes;
+    int num_runs;        // 运行次数
+    double std_dev_ms;   // 标准差（毫秒）
 
     std::string ToCsv() const
     {
@@ -57,6 +61,7 @@ struct RealisticResult
            << std::fixed << std::setprecision(3) << time_ms << ","
            << std::fixed << std::setprecision(1) << time_us << ","
            << std::fixed << std::setprecision(2) << time_per_node_us << ","
+           << num_runs << "," << std::fixed << std::setprecision(3) << std_dev_ms << ","
            << "\"" << notes << "\"";
         return ss.str();
     }
@@ -66,7 +71,76 @@ struct RealisticResult
 // CSV 头部
 // ================================================================
 const std::string CSV_HEADER =
-    "TestName,Scenario,TopologyType,Nodes,Edges,Algorithm,Time_ms,Time_us,TimePerNode_us,Notes";
+    "TestName,Scenario,TopologyType,Nodes,Edges,Algorithm,Time_ms,Time_us,TimePerNode_us,NumRuns,StdDev_ms,Notes";
+
+// ================================================================
+// 计时和统计辅助函数
+// ================================================================
+
+// 运行计时函数，支持多次运行取平均值
+// 如果单次运行时间 < threshold_ms 秒，则运行 num_iterations 次取平均
+struct TimingResult
+{
+    double avg_time_ms;
+    double avg_time_us;
+    double std_dev_ms;
+    int num_runs;
+};
+
+TimingResult TimeFunction(std::function<void()> func,
+                          double threshold_ms = 5000.0,  // 5秒阈值
+                          int num_iterations = 10)        // 快速测试运行10次
+{
+    std::vector<double> times_ms;
+
+    // 第一次运行，检测时间
+    {
+        auto start = std::chrono::high_resolution_clock::now();
+        func();
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double, std::milli> elapsed = end - start;
+        times_ms.push_back(elapsed.count());
+    }
+
+    // 如果第一次运行时间小于阈值，再运行多次
+    if (times_ms[0] < threshold_ms)
+    {
+        int additional_runs = num_iterations - 1;
+        for (int i = 0; i < additional_runs; i++)
+        {
+            auto start = std::chrono::high_resolution_clock::now();
+            func();
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double, std::milli> elapsed = end - start;
+            times_ms.push_back(elapsed.count());
+        }
+    }
+
+    // 计算平均值和标准差
+    double sum = 0;
+    for (double t : times_ms)
+    {
+        sum += t;
+    }
+    double avg = sum / times_ms.size();
+
+    // 计算标准差
+    double variance = 0;
+    for (double t : times_ms)
+    {
+        variance += (t - avg) * (t - avg);
+    }
+    variance /= times_ms.size();
+    double std_dev = std::sqrt(variance);
+
+    TimingResult result;
+    result.avg_time_ms = avg;
+    result.avg_time_us = avg * 1000.0;
+    result.std_dev_ms = std_dev;
+    result.num_runs = times_ms.size();
+
+    return result;
+}
 
 // ================================================================
 // 实际场景拓扑创建函数
@@ -312,13 +386,10 @@ RealisticResult RunRealisticTest(const std::string &testName,
     NS_LOG_UNCOND("Notes: " << notes);
     NS_LOG_UNCOND("------------------------------------------------");
 
-    // 计算路由表并计时
-    auto start = std::chrono::high_resolution_clock::now();
-    Ipv4GlobalRoutingHelper::PopulateRoutingTables();
-    auto end = std::chrono::high_resolution_clock::now();
-
-    std::chrono::duration<double, std::milli> elapsed_ms = end - start;
-    std::chrono::duration<double, std::micro> elapsed_us = end - start;
+    // 使用计时函数运行，使用 RecomputeRoutingTables 进行多次测试
+    TimingResult timing = TimeFunction([&]() {
+        Ipv4GlobalRoutingHelper::RecomputeRoutingTables();
+    });
 
     RealisticResult result;
     result.testName = testName;
@@ -326,14 +397,17 @@ RealisticResult RunRealisticTest(const std::string &testName,
     result.topologyType = topologyType;
     result.nodes = nodes;
     result.edges = edges;
-    result.algorithm = "Dijkstra";  // Switched via make breaking/dijkstra
-    result.time_ms = elapsed_ms.count();
-    result.time_us = elapsed_us.count();
-    result.time_per_node_us = elapsed_us.count() / nodes;
+    result.algorithm = "Breaking";  // Switched via make breaking/dijkstra
+    result.time_ms = timing.avg_time_ms;
+    result.time_us = timing.avg_time_us;
+    result.time_per_node_us = timing.avg_time_us / nodes;
+    result.num_runs = timing.num_runs;
+    result.std_dev_ms = timing.std_dev_ms;
     result.notes = notes;
 
     NS_LOG_UNCOND("Time: " << result.time_ms << " ms (" << result.time_us << " us)");
     NS_LOG_UNCOND("Time per node: " << result.time_per_node_us << " us");
+    NS_LOG_UNCOND("Runs: " << result.num_runs << ", StdDev: " << result.std_dev_ms << " ms");
 
     return result;
 }

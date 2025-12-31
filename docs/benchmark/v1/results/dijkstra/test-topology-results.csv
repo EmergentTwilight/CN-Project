@@ -1,0 +1,5 @@
+TestName,TopologyType,TopologyDesc,Nodes,Edges,AvgPathLength,Algorithm,Time_ms,Time_us
+Exp4_1,Grid,2D Regular Grid,100,180,0.00,Dijkstra,446.539,446538.9
+Exp4_2,Random,Erdős-Rényi Random Graph,100,425,0.00,Dijkstra,4905.608,4905608.2
+Exp4_3,Star,Central Hub Topology,100,99,0.00,Dijkstra,2.561,2561.3
+Exp4_4,Tree,Binary Tree Structure,100,99,0.00,Dijkstra,30.127,30126.9

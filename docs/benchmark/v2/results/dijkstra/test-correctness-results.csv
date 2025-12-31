@@ -1,0 +1,5 @@
+TestName,Topology,Nodes,Edges,Algorithm,Time_ms,Time_us,NumRuns,StdDev_ms,Status,Error
+Exp1_1,Grid5x5,25,40,Dijkstra,6.257,6256.6,10,0.123,PASS,
+Exp1_2,Grid10x10,100,180,Dijkstra,440.707,440706.5,10,4.462,PASS,
+Exp1_3,Star20,20,19,Dijkstra,0.163,163.2,10,0.014,PASS,
+Exp1_4,Complete10,10,45,Dijkstra,1.651,1651.3,10,0.034,PASS,

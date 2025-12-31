@@ -1,0 +1,5 @@
+TestName,Topology,Nodes,Edges,Density,Algorithm,Time_ms,Time_us,TimePerNode_us,Memory_kb
+Exp2_1,Grid5x5,25,40,1.60,Dijkstra,10.401,10401.0,416.04,0
+Exp2_2,Grid10x10,100,180,1.80,Dijkstra,469.652,469651.9,4696.52,0
+Exp2_3,Grid15x15,225,420,1.87,Dijkstra,5430.418,5430418.0,24135.19,0
+Exp2_4,Grid20x20,400,760,1.90,Dijkstra,32072.169,32072169.5,80180.42,0

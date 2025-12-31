@@ -34,18 +34,24 @@ struct BmsspEdge
 namespace BlockHeap
 {
 
+// Forward declaration
+template <typename K, typename V>
+struct BlockHeapBlock;
+
 // Node in the linked list (renamed to avoid conflict with ns3::Node)
 template <typename K, typename V>
 struct BlockHeapNode
 {
     K key;
     V value;
+    BlockHeapBlock<K, V>* block;  // Pointer to the block containing this node
     BlockHeapNode* prev;
     BlockHeapNode* next;
 
-    BlockHeapNode(K k, V v)
+    BlockHeapNode(K k, V v, BlockHeapBlock<K, V>* b = nullptr)
         : key(k),
           value(v),
+          block(b),
           prev(nullptr),
           next(nullptr)
     {
@@ -144,7 +150,7 @@ class BlockHeapDS
         D1Bounds.insert({globalB, 0});
     }
 
-    // Delete(key, value) - O(1) for deletion
+    // Delete(key, value) - O(1) for deletion using node->block
     void Delete(K key, V value)
     {
         auto it = keyToNode.find(key);
@@ -154,86 +160,31 @@ class BlockHeapDS
         }
 
         BlockHeapNode<K, V>* node = it->second;
+        BlockHeapBlock<K, V>* block = node->block;
 
-        // Find which block contains this node and remove it
-        bool found = false;
-        for (auto b : D1)
+        // Remove from linked list using the block pointer
+        if (node->prev)
         {
-            BlockHeapNode<K, V>* curr = b->head;
-            while (curr)
-            {
-                if (curr == node)
-                {
-                    // Remove from linked list
-                    if (curr->prev)
-                    {
-                        curr->prev->next = curr->next;
-                    }
-                    else
-                    {
-                        b->head = curr->next;
-                    }
-                    if (curr->next)
-                    {
-                        curr->next->prev = curr->prev;
-                    }
-                    else
-                    {
-                        b->tail = curr->prev;
-                    }
-                    b->size--;
-                    found = true;
-                    break;
-                }
-                curr = curr->next;
-            }
-            if (found)
-            {
-                break;
-            }
+            node->prev->next = node->next;
         }
-        if (!found)
+        else
         {
-            for (auto b : D0)
-            {
-                BlockHeapNode<K, V>* curr = b->head;
-                while (curr)
-                {
-                    if (curr == node)
-                    {
-                        // Remove from linked list
-                        if (curr->prev)
-                        {
-                            curr->prev->next = curr->next;
-                        }
-                        else
-                        {
-                            b->head = curr->next;
-                        }
-                        if (curr->next)
-                        {
-                            curr->next->prev = curr->prev;
-                        }
-                        else
-                        {
-                            b->tail = curr->prev;
-                        }
-                        b->size--;
-                        found = true;
-                        break;
-                    }
-                    curr = curr->next;
-                }
-                if (found)
-                {
-                    break;
-                }
-            }
+            block->head = node->next;
         }
 
-        // Remove from keyToNode first
+        if (node->next)
+        {
+            node->next->prev = node->prev;
+        }
+        else
+        {
+            block->tail = node->prev;
+        }
+
+        block->size--;
+
+        // Remove from keyToNode and delete
         keyToNode.erase(it);
-        // Then delete the node
         delete node;
     }
 
@@ -263,7 +214,68 @@ class BlockHeapDS
         delete node;
     }
 
-    // Find median of a linked list and partition
+    // Quickselect: O(n) algorithm to find k-th smallest element
+    // Returns index of the k-th smallest element (0-based)
+    // Partitions the array such that:
+    //   - elements [0, pivot_idx-1] are <= pivot
+    //   - elements [pivot_idx+1, end] are >= pivot
+    size_t QuickselectPartition(std::vector<BlockHeapNode<K, V>*>& nodes, size_t left, size_t right, size_t k)
+    {
+        while (left < right && nodes.size() > 0)
+        {
+            // Use median-of-three pivot selection
+            size_t mid = left + (right - left) / 2;
+            auto compare = [](const BlockHeapNode<K, V>* a, const BlockHeapNode<K, V>* b) {
+                if (a->value != b->value)
+                    return a->value < b->value;
+                return a->key < b->key;
+            };
+
+            // Sort left, mid, right to get median
+            if (compare(nodes[right], nodes[left]))
+                std::swap(nodes[left], nodes[right]);
+            if (compare(nodes[mid], nodes[left]))
+                std::swap(nodes[left], nodes[mid]);
+            if (compare(nodes[right], nodes[mid]))
+                std::swap(nodes[mid], nodes[right]);
+
+            // Use mid as pivot
+            V pivotValue = nodes[mid]->value;
+            K pivotKey = nodes[mid]->key;
+            std::swap(nodes[mid], nodes[right]);
+
+            // Partition
+            size_t i = left;
+            for (size_t j = left; j < right; j++)
+            {
+                bool less = (nodes[j]->value < pivotValue) ||
+                           (nodes[j]->value == pivotValue && nodes[j]->key < pivotKey);
+                if (less)
+                {
+                    std::swap(nodes[i], nodes[j]);
+                    i++;
+                }
+            }
+            std::swap(nodes[i], nodes[right]);
+
+            // Check if pivot is at position k
+            if (k == i)
+            {
+                return i;
+            }
+            else if (k < i)
+            {
+                right = i - 1;
+            }
+            else
+            {
+                left = i + 1;
+            }
+        }
+        return left;
+    }
+
+    // Find median using Quickselect and partition
     std::vector<BlockHeapNode<K, V>*> FindMedianAndPartition(BlockHeapBlock<K, V>* block)
     {
         std::vector<BlockHeapNode<K, V>*> nodes;
@@ -279,26 +291,33 @@ class BlockHeapDS
             return nodes;
         }
 
-        // Sort by value (and key for ties)
-        std::sort(nodes.begin(), nodes.end(), [](const BlockHeapNode<K, V>* a, const BlockHeapNode<K, V>* b) {
-            if (a->value != b->value)
-            {
-                return a->value < b->value;
-            }
-            return a->key < b->key;
-        });
-
-        // Find median
+        // Find median index using Quickselect - O(n)
         size_t mid = nodes.size() / 2;
+        if (nodes.size() > 0)
+        {
+            QuickselectPartition(nodes, 0, nodes.size() - 1, mid);
+        }
 
-        // Partition: first half goes to first block, rest to second
+        // Now nodes is partitioned around the median
+        // elements [0, mid-1] <= nodes[mid]
+        // elements [mid+1, end] >= nodes[mid]
+        // But the partition isn't fully sorted, so we need to collect second half
+
+        std::vector<BlockHeapNode<K, V>*> firstHalf;
         std::vector<BlockHeapNode<K, V>*> secondHalf;
+
+        // Use stable partition based on comparison with median
+        auto* medianNode = nodes[mid];
+        V medianValue = medianNode->value;
+        K medianKey = medianNode->key;
 
         for (size_t i = 0; i < nodes.size(); i++)
         {
-            if (i < mid)
+            bool less = (nodes[i]->value < medianValue) ||
+                       (nodes[i]->value == medianValue && nodes[i]->key < medianKey);
+            if (less || (nodes[i] == medianNode && firstHalf.size() < mid))
             {
-                // Stays in first block
+                firstHalf.push_back(nodes[i]);
             }
             else
             {
@@ -306,14 +325,31 @@ class BlockHeapDS
             }
         }
 
-        // Rebuild block with first half
+        // Ensure first half has exactly mid elements
+        while (firstHalf.size() > mid)
+        {
+            secondHalf.push_back(firstHalf.back());
+            firstHalf.pop_back();
+        }
+        while (firstHalf.size() < mid && !secondHalf.empty())
+        {
+            firstHalf.push_back(secondHalf.back());
+            secondHalf.pop_back();
+        }
+
+        // Rebuild block with first half (sorted for consistency)
+        std::sort(firstHalf.begin(), firstHalf.end(), [](const BlockHeapNode<K, V>* a, const BlockHeapNode<K, V>* b) {
+            if (a->value != b->value)
+                return a->value < b->value;
+            return a->key < b->key;
+        });
+
         block->head = nullptr;
         block->tail = nullptr;
         block->size = 0;
 
-        for (size_t i = 0; i < mid; i++)
+        for (auto* node : firstHalf)
         {
-            auto* node = nodes[i];
             node->prev = block->tail;
             node->next = nullptr;
             if (block->tail)
@@ -361,6 +397,8 @@ class BlockHeapDS
 
         for (auto* node : secondHalfNodes)
         {
+            // Update block pointer when moving to new block
+            node->block = newBlock;
             node->prev = newBlock->tail;
             node->next = nullptr;
             if (newBlock->tail)
@@ -416,11 +454,7 @@ class BlockHeapDS
             Delete(key, it->second->value);
         }
 
-        // Create new node
-        BlockHeapNode<K, V>* newNode = new BlockHeapNode<K, V>(key, value);
-        keyToNode[key] = newNode;
-
-        // Find the appropriate block in D1
+        // Find the appropriate block in D1 first
         int targetBlockIdx = 0;
         auto ubIt = D1Bounds.lower_bound({value, 0});
         if (ubIt != D1Bounds.end())
@@ -433,6 +467,10 @@ class BlockHeapDS
         }
 
         BlockHeapBlock<K, V>* block = D1[targetBlockIdx];
+
+        // Create new node with block pointer
+        BlockHeapNode<K, V>* newNode = new BlockHeapNode<K, V>(key, value, block);
+        keyToNode[key] = newNode;
 
         // Add node to block
         newNode->prev = block->tail;
@@ -537,7 +575,7 @@ class BlockHeapDS
                     Delete(key, oldIt->second->value);
                 }
 
-                BlockHeapNode<K, V>* newNode = new BlockHeapNode<K, V>(key, value);
+                BlockHeapNode<K, V>* newNode = new BlockHeapNode<K, V>(key, value, newBlock);
                 keyToNode[key] = newNode;
 
                 newNode->prev = newBlock->tail;

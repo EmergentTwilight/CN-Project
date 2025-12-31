@@ -30,6 +30,9 @@
 #include <iomanip>
 #include <random>
 #include <set>
+#include <vector>
+#include <cmath>
+#include <functional>
 
 using namespace ns3;
 
@@ -50,6 +53,8 @@ struct DensityResult
     double time_ms;
     double time_us;
     double speedup; // vs baseline
+    int num_runs;        // 运行次数
+    double std_dev_ms;   // 标准差（毫秒）
 
     std::string ToCsv() const
     {
@@ -59,7 +64,8 @@ struct DensityResult
            << densityLevel << "," << algorithm << ","
            << std::fixed << std::setprecision(3) << time_ms << ","
            << std::fixed << std::setprecision(1) << time_us << ","
-           << std::fixed << std::setprecision(2) << speedup;
+           << std::fixed << std::setprecision(2) << speedup << ","
+           << num_runs << "," << std::fixed << std::setprecision(3) << std_dev_ms;
         return ss.str();
     }
 };
@@ -68,7 +74,76 @@ struct DensityResult
 // CSV 头部
 // ================================================================
 const std::string CSV_HEADER =
-    "TestName,Topology,Nodes,Edges,Density,DensityLevel,Algorithm,Time_ms,Time_us,Speedup";
+    "TestName,Topology,Nodes,Edges,Density,DensityLevel,Algorithm,Time_ms,Time_us,Speedup,NumRuns,StdDev_ms";
+
+// ================================================================
+// 计时和统计辅助函数
+// ================================================================
+
+// 运行计时函数，支持多次运行取平均值
+// 如果单次运行时间 < threshold_ms 秒，则运行 num_iterations 次取平均
+struct TimingResult
+{
+    double avg_time_ms;
+    double avg_time_us;
+    double std_dev_ms;
+    int num_runs;
+};
+
+TimingResult TimeFunction(std::function<void()> func,
+                          double threshold_ms = 5000.0,  // 5秒阈值
+                          int num_iterations = 10)        // 快速测试运行10次
+{
+    std::vector<double> times_ms;
+
+    // 第一次运行，检测时间
+    {
+        auto start = std::chrono::high_resolution_clock::now();
+        func();
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double, std::milli> elapsed = end - start;
+        times_ms.push_back(elapsed.count());
+    }
+
+    // 如果第一次运行时间小于阈值，再运行多次
+    if (times_ms[0] < threshold_ms)
+    {
+        int additional_runs = num_iterations - 1;
+        for (int i = 0; i < additional_runs; i++)
+        {
+            auto start = std::chrono::high_resolution_clock::now();
+            func();
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double, std::milli> elapsed = end - start;
+            times_ms.push_back(elapsed.count());
+        }
+    }
+
+    // 计算平均值和标准差
+    double sum = 0;
+    for (double t : times_ms)
+    {
+        sum += t;
+    }
+    double avg = sum / times_ms.size();
+
+    // 计算标准差
+    double variance = 0;
+    for (double t : times_ms)
+    {
+        variance += (t - avg) * (t - avg);
+    }
+    variance /= times_ms.size();
+    double std_dev = std::sqrt(variance);
+
+    TimingResult result;
+    result.avg_time_ms = avg;
+    result.avg_time_us = avg * 1000.0;
+    result.std_dev_ms = std_dev;
+    result.num_runs = times_ms.size();
+
+    return result;
+}
 
 // ================================================================
 // 创建随机拓扑
@@ -141,7 +216,8 @@ DensityResult RunDensityTest(const std::string &testName,
                               const std::string &densityLevel,
                               uint32_t nodes, uint32_t edges,
                               double density,
-                              const std::string &algorithm)
+                              const std::string &algorithm,
+                              double probability)
 {
     NS_LOG_UNCOND("------------------------------------------------");
     NS_LOG_UNCOND("Running: " << testName << " (" << densityLevel << ")");
@@ -150,13 +226,68 @@ DensityResult RunDensityTest(const std::string &testName,
     NS_LOG_UNCOND("Algorithm: " << algorithm);
     NS_LOG_UNCOND("------------------------------------------------");
 
-    // 计算路由表并计时
-    auto start = std::chrono::high_resolution_clock::now();
-    Ipv4GlobalRoutingHelper::PopulateRoutingTables();
-    auto end = std::chrono::high_resolution_clock::now();
+    // 使用计时函数运行，需要重新创建拓扑因为 PopulateRoutingTables 只能执行一次
+    TimingResult timing = TimeFunction([&]() {
+        // 每次运行需要重新创建网络拓扑
+        Simulator::Destroy();
+        Ipv4AddressGenerator::Reset();
 
-    std::chrono::duration<double, std::milli> elapsed_ms = end - start;
-    std::chrono::duration<double, std::micro> elapsed_us = end - start;
+        PointToPointHelper p2p;
+        p2p.SetDeviceAttribute("DataRate", StringValue("5Mbps"));
+        p2p.SetChannelAttribute("Delay", StringValue("2ms"));
+
+        NodeContainer tempNodes;
+        tempNodes.Create(nodes);
+
+        InternetStackHelper stack;
+        stack.Install(tempNodes);
+
+        uint32_t linkIndex = 0;
+
+        // 使用随机数生成器（固定种子以保持一致性）
+        std::mt19937 gen(42); // 固定种子
+        std::uniform_real_distribution<> dis(0.0, 1.0);
+
+        // 创建边（无向图，只创建 i < j 的边）
+        for (uint32_t i = 0; i < nodes; i++)
+        {
+            for (uint32_t j = i + 1; j < nodes; j++)
+            {
+                if (dis(gen) < probability)
+                {
+                    NetDeviceContainer devices = p2p.Install(tempNodes.Get(i), tempNodes.Get(j));
+
+                    Ipv4AddressHelper address;
+                    std::stringstream subnet;
+                    subnet << "10." << (linkIndex / 256) << "." << (linkIndex % 256) << ".0";
+                    address.SetBase(subnet.str().c_str(), "255.255.255.0");
+
+                    Ipv4InterfaceContainer interfaces = address.Assign(devices);
+                    linkIndex++;
+                }
+            }
+        }
+
+        // 确保图是连通的（添加最小生成树）
+        for (uint32_t i = 0; i < nodes - 1; i++)
+        {
+            NetDeviceContainer devices = p2p.Install(tempNodes.Get(i), tempNodes.Get(i + 1));
+
+            Ipv4AddressHelper address;
+            std::stringstream subnet;
+            subnet << "10." << (linkIndex / 256) << "." << (linkIndex % 256) << ".0";
+            address.SetBase(subnet.str().c_str(), "255.255.255.0");
+
+            Ipv4InterfaceContainer interfaces = address.Assign(devices);
+            linkIndex++;
+        }
+
+        // 计算路由表
+        Ipv4GlobalRoutingHelper::PopulateRoutingTables();
+
+        // 清理
+        Simulator::Destroy();
+    });
 
     DensityResult result;
     result.testName = testName;
@@ -165,12 +296,15 @@ DensityResult RunDensityTest(const std::string &testName,
     result.edges = edges;
     result.density = density;
     result.densityLevel = densityLevel;
-    result.algorithm = "Dijkstra";  // Switched via make breaking/dijkstra
-    result.time_ms = elapsed_ms.count();
-    result.time_us = elapsed_us.count();
+    result.algorithm = "Breaking";  // Switched via make breaking/dijkstra
+    result.time_ms = timing.avg_time_ms;
+    result.time_us = timing.avg_time_us;
+    result.num_runs = timing.num_runs;
+    result.std_dev_ms = timing.std_dev_ms;
     result.speedup = 1.0; // 需要对比数据计算
 
     NS_LOG_UNCOND("Time: " << result.time_ms << " ms (" << result.time_us << " us)");
+    NS_LOG_UNCOND("Runs: " << result.num_runs << ", StdDev: " << result.std_dev_ms << " ms");
 
     return result;
 }
@@ -235,17 +369,15 @@ int main(int argc, char *argv[])
         Simulator::Destroy();
         Ipv4AddressGenerator::Reset();
 
-        NodeContainer nodes;
-        uint32_t edges = CreateRandomTopology(nNodes, config.probability, nodes);
-        double actualDensity = (double)edges / nNodes;
-
-        NS_LOG_UNCOND("Actual edges: " << edges << ", density: " << actualDensity);
+        // 计算预期边数（用于记录）
+        uint32_t expectedEdges = (uint32_t)(config.targetDensity * nNodes);
+        double expectedDensity = config.targetDensity;
 
         std::string testName = "Exp3_" + std::to_string(testNum);
 
-        // 运行 Breaking 算法测试
+        // 运行 Breaking 算法测试（内部会创建拓扑并计时）
         DensityResult result = RunDensityTest(
-            testName, config.level, nNodes, edges, actualDensity, "Breaking");
+            testName, config.level, nNodes, expectedEdges, expectedDensity, "Breaking", config.probability);
         csvFile << result.ToCsv() << std::endl;
 
         NS_LOG_UNCOND("");

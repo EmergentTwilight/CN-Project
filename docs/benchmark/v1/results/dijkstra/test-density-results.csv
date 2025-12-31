@@ -1,0 +1,6 @@
+TestName,Topology,Nodes,Edges,Density,DensityLevel,Algorithm,Time_ms,Time_us,Speedup
+Exp3_1,Random,100,252,2.52,Sparse,Dijkstra,824.569,824569.4,1.00
+Exp3_2,Random,100,382,3.82,Medium,Dijkstra,3205.763,3205763.1,1.00
+Exp3_3,Random,100,613,6.13,Dense,Dijkstra,14000.692,14000692.3,1.00
+Exp3_4,Random,100,1074,10.74,VeryDense,Dijkstra,79650.401,79650400.5,1.00
+Exp3_5,Random,100,2064,20.64,UltraDense,Dijkstra,2088437.100,2088437099.8,1.00

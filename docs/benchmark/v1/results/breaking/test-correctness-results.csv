@@ -1,0 +1,5 @@
+TestName,Topology,Nodes,Edges,Algorithm,Time_ms,Time_us,Status,Error
+Exp1_1,Grid5x5,25,40,Breaking,5.186,5185.9,PASS,
+Exp1_2,Grid10x10,100,180,Breaking,737.738,737737.9,PASS,
+Exp1_3,Star20,20,19,Breaking,1.324,1324.2,PASS,
+Exp1_4,Complete10,10,45,Breaking,0.972,972.3,PASS,

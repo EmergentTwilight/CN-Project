@@ -14,7 +14,7 @@
 NS3_DIR = ns-allinone-3.46.1/ns-3.46.1
 
 # Results directory
-RESULTS_DIR = results
+RESULTS_DIR = docs/benchmark/v2/results
 
 # Algorithm selection state file
 ALG_STATE_FILE = .alg_state
