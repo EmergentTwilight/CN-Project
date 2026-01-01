@@ -9,6 +9,7 @@
 
 .PHONY: all configure clean help breaking dijkstra show-alg setup-results
 .PHONY: test-correctness test-scalability test-density test-topology test-realistic test-all
+.PHONY: test-large-scale test-large-scale-quick
 
 # NS-3 directory path
 NS3_DIR = ns-allinone-3.46.1/ns-3.46.1
@@ -177,6 +178,49 @@ test-all: setup-results
 	@echo "Results in: $(RESULTS_DIR)/$(CURRENT_ALG)/"
 
 # ==============================================================================
+# LARGE-SCALE TESTS
+# ==============================================================================
+# WARNING: Large-scale tests can take several hours!
+# Use test-large-scale-quick for a quick test instead.
+# ==============================================================================
+
+test-large-scale-quick: setup-results
+	@echo "================================================================"
+	@echo "Running Large-Scale Tests (Quick Mode - Small Scale)"
+	@echo "================================================================"
+	@echo "Test scope: 625-1225 nodes (estimated time: 3-5 minutes)"
+	@echo "================================================================"
+	@cd $(NS3_DIR) && ./ns3 run --no-build "test-large-scale --quick" 2>/dev/null
+	@if [ -f $(NS3_DIR)/test-large-scale-results.csv ]; then \
+		ALG=$$(head -1 $(NS3_DIR)/test-large-scale-results.csv | grep -oP '(?<=Algorithm:)[^,]*' | head -1); \
+		if [ -z "$$ALG" ]; then ALG="$(CURRENT_ALG)"; fi; \
+		mkdir -p $(RESULTS_DIR)/$$ALG; \
+		cp $(NS3_DIR)/test-large-scale-results.csv $(RESULTS_DIR)/$$ALG/test-large-scale-results-quick.csv; \
+		echo "✓ Results: $(RESULTS_DIR)/$$ALG/test-large-scale-results-quick.csv"; \
+	fi
+
+test-large-scale: setup-results
+	@echo "================================================================"
+	@echo "⚠️  WARNING: Large-Scale Test"
+	@echo "================================================================"
+	@echo "This test will run 625-22500 nodes (estimated time: several hours)"
+	@echo ""
+	@echo "Are you sure you want to continue? Press Ctrl+C to cancel."
+	@echo "Starting in 5 seconds..."
+	@sleep 5
+	@echo "================================================================"
+	@echo "Running Large-Scale Tests (Full Scale)"
+	@echo "================================================================"
+	@cd $(NS3_DIR) && ./ns3 run --no-build "test-large-scale" 2>/dev/null
+	@if [ -f $(NS3_DIR)/test-large-scale-results.csv ]; then \
+		ALG=$$(head -1 $(NS3_DIR)/test-large-scale-results.csv | grep -oP '(?<=Algorithm:)[^,]*' | head -1); \
+		if [ -z "$$ALG" ]; then ALG="$(CURRENT_ALG)"; fi; \
+		mkdir -p $(RESULTS_DIR)/$$ALG; \
+		cp $(NS3_DIR)/test-large-scale-results.csv $(RESULTS_DIR)/$$ALG/test-large-scale-results-full.csv; \
+		echo "✓ Results: $(RESULTS_DIR)/$$ALG/test-large-scale-results-full.csv"; \
+	fi
+
+# ==============================================================================
 # HELP
 # ==============================================================================
 
@@ -192,12 +236,16 @@ help:
 	@echo "  make clean             Clean build files"
 	@echo ""
 	@echo "TEST TARGETS (run tests, no build, quiet output):"
-	@echo "  make test-correctness  Run Exp1: Correctness verification"
-	@echo "  make test-scalability  Run Exp2: Node scaling tests"
-	@echo "  make test-density      Run Exp3: Graph density tests"
-	@echo "  make test-topology     Run Exp4: Topology type tests"
-	@echo "  make test-realistic    Run Exp5: Real-world scenarios"
-	@echo "  make test-all          Run all experiments"
+	@echo "  make test-correctness      Run Exp1: Correctness verification"
+	@echo "  make test-scalability      Run Exp2: Node scaling tests"
+	@echo "  make test-density          Run Exp3: Graph density tests"
+	@echo "  make test-topology         Run Exp4: Topology type tests"
+	@echo "  make test-realistic        Run Exp5: Real-world scenarios"
+	@echo "  make test-all              Run all experiments"
+	@echo ""
+	@echo "LARGE-SCALE TESTS:"
+	@echo "  make test-large-scale-quick Run quick large-scale test (3-5 min)"
+	@echo "  make test-large-scale       Run full large-scale test (hours!)"
 	@echo ""
 	@echo "TYPICAL WORKFLOW:"
 	@echo "  1. make configure       # First time setup"

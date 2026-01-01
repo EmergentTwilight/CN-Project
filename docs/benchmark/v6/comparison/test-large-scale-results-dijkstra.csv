@@ -1,0 +1,2 @@
+TestName,TopologyType,Nodes,Edges,Density,Algorithm,Time_ms,Time_us,TimePerNode_us,NumRuns,StdDev_ms,MemoryBefore_mb,MemoryAfter_mb,MemoryPeak_mb,MemoryDelta_mb,TimeoutTriggered,MemoryLimitExceeded,TestPassed,ErrorMessage,Param_k,Param_t,Param_l,EstimatedTime_sec,ActualTime_sec,EstimationError_pct
+Warmup_25x25,Grid,625,2400,0.01,Breaking,127469.048,127469047.6,203950.48,1,0.000,335.7,335.8,335.8,0.1,false,false,true,"",0,0,0,10.0,127.5,1174.7

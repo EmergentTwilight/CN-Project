@@ -1,0 +1,4 @@
+TestName,TopologyType,Nodes,Edges,Density,Algorithm,Time_ms,Time_us,TimePerNode_us,NumRuns,StdDev_ms,MemoryBefore_mb,MemoryAfter_mb,MemoryPeak_mb,MemoryDelta_mb,TimeoutTriggered,MemoryLimitExceeded,TestPassed,ErrorMessage,Param_k,Param_t,Param_l,EstimatedTime_sec,ActualTime_sec,EstimationError_pct
+Warmup_25x25,Grid,625,2400,0.01,Breaking,22274.07,22274070.1,35638.51,1,0.000,144.0,153.8,153.8,9.9,false,false,true,"",0,0,0,10.0,22.3,122.7
+Warmup_30x30,Grid,900,3480,0.01,Breaking,60030.70,60030695.2,66700.77,1,0.000,240.8,258.8,258.8,18.0,false,false,true,"",0,0,0,20.0,60.0,200.2
+Scale_35x35,Grid,1225,4760,0.01,Breaking,129041.53,129041533.6,105340.03,1,0.000,374.4,402.7,402.7,28.3,false,false,true,"",0,0,0,40.0,129.0,222.6

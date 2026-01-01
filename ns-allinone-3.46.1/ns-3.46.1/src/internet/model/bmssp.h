@@ -73,7 +73,7 @@ struct BlockHeapBlock
           tail(nullptr),
           size(0),
           upperBound(V()),
-          owns_nodes(true)
+          owns_nodes(false)  // Memory pool manages node memory
     {
     }
 
@@ -101,6 +101,79 @@ template <typename K, typename V>
 class BlockHeapDS
 {
   private:
+    // ============ Memory Pool for BlockHeapNode ============
+    // Reduces allocation overhead by reusing node memory
+    struct NodePool
+    {
+        struct Block
+        {
+            static constexpr size_t BLOCK_SIZE = 4096;  // ~100+ nodes per block
+            alignas(BlockHeapNode<K, V>) char data[BLOCK_SIZE];
+            Block* next;
+        };
+
+        Block* head = nullptr;
+        Block* current = nullptr;
+        size_t currentOffset = 0;
+        size_t nodeSize = sizeof(BlockHeapNode<K, V>);
+
+        NodePool()
+        {
+            AllocateNewBlock();
+        }
+
+        ~NodePool()
+        {
+            while (head)
+            {
+                Block* next = head->next;
+                delete head;
+                head = next;
+            }
+        }
+
+        // Allocate a new node from the pool
+        BlockHeapNode<K, V>* Allocate(K k, V v, BlockHeapBlock<K, V>* b)
+        {
+            // Check if we need a new block
+            if (current == nullptr || currentOffset + nodeSize > Block::BLOCK_SIZE)
+            {
+                AllocateNewBlock();
+            }
+
+            // Get pointer from current block
+            void* ptr = &current->data[currentOffset];
+            currentOffset += nodeSize;
+
+            // Construct node using placement new
+            return new(ptr) BlockHeapNode<K, V>(k, v, b);
+        }
+
+        // Deallocate a node (simple version: just call destructor)
+        void Deallocate(BlockHeapNode<K, V>* node)
+        {
+            if (node)
+            {
+                node->~BlockHeapNode<K, V>();
+                // Note: We don't reuse the memory immediately to avoid complexity
+                // The pool will be reused on the next BlockHeapDS construction
+            }
+        }
+
+        void AllocateNewBlock()
+        {
+            Block* newBlock = new Block();
+            newBlock->next = head;
+            head = newBlock;
+            current = newBlock;
+            currentOffset = 0;
+        }
+
+        // Disable copy and move
+        NodePool(const NodePool&) = delete;
+        NodePool& operator=(const NodePool&) = delete;
+    };
+
     int M;     // Block size parameter
     V globalB; // Global upper bound
     int N;     // Expected number of insertions
@@ -123,6 +196,9 @@ class BlockHeapDS
     // Track minimum value of each block for O(1) min lookup
     std::set<std::pair<V, int>> D0MinValues;  // (minValue, blockIndex) for D0
     std::set<std::pair<V, int>> D1MinValues;  // (minValue, blockIndex) for D1
+
+    // Memory pool for node allocation
+    NodePool nodePool;
 
     // Helper function to update block minimum
     void UpdateBlockMin(BlockHeapBlock<K, V>* block, int blockIdx, bool isD0)
@@ -227,9 +303,9 @@ class BlockHeapDS
             }
         }
 
-        // Remove from keyToNode and delete
+        // Remove from keyToNode and delete using memory pool
         keyToNode.erase(it);
-        delete node;
+        nodePool.Deallocate(node);
     }
 
     // Delete node from a specific block
@@ -255,7 +331,7 @@ class BlockHeapDS
 
         block->size--;
         keyToNode.erase(node->key);
-        delete node;
+        nodePool.Deallocate(node);
     }
 
     // Quickselect: O(n) algorithm to find k-th smallest element
@@ -522,8 +598,8 @@ class BlockHeapDS
 
         BlockHeapBlock<K, V>* block = D1[targetBlockIdx];
 
-        // Create new node with block pointer
-        BlockHeapNode<K, V>* newNode = new BlockHeapNode<K, V>(key, value, block);
+        // Create new node with block pointer using memory pool
+        BlockHeapNode<K, V>* newNode = nodePool.Allocate(key, value, block);
         keyToNode[key] = newNode;
 
         // Add node to block

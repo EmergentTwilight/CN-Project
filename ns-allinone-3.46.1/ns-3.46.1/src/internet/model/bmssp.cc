@@ -137,6 +137,11 @@ BmsspSolver::FindPivots(BmsspLength B, const VertexSet& S)
     VertexSet W_curr;
     std::unordered_set<int> inW;
 
+    // P1 optimization: reserve capacity to avoid reallocations
+    W.reserve(k * S.size() * 2);
+    W_curr.reserve(k * S.size());
+    inW.reserve(k * S.size() * 2);
+
     // W_0 = S
     for (int v : S)
     {
@@ -202,6 +207,10 @@ BmsspSolver::FindPivots(BmsspLength B, const VertexSet& S)
     std::unordered_map<int, std::vector<int>> children;
     std::unordered_map<int, int> parent;
     std::unordered_set<int> inW_set(W.begin(), W.end());
+
+    // P1 optimization: reserve capacity for hash tables
+    children.reserve(W.size());
+    parent.reserve(W.size());
 
     for (int u : W)
     {
@@ -277,6 +286,9 @@ BmsspSolver::BaseCase(BmsspLength B, const VertexSet& S)
     }
 
     int x = S[0];
+
+    // P1 optimization: reserve capacity
+    U.reserve(k + 1);
 
     // Binary heap (priority queue) for Dijkstra
     using P = std::pair<BmsspLength, int>;
@@ -415,6 +427,9 @@ BmsspSolver::BMSSP(int level, BmsspLength B, const VertexSet& S)
     BmsspLength B_prime_0 = B_prev;
     BmsspLength B_prime_i = B_prime_0;
     U.clear();
+
+    // P1 optimization: reserve capacity for U
+    U.reserve(k * (1 << (level * t)));
 
     // Step 4: Main loop
     while ((int)U.size() < k * (1 << (level * t)) && !D.IsEmpty())
