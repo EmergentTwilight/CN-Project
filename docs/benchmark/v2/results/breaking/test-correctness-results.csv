@@ -1,5 +1,5 @@
 TestName,Topology,Nodes,Edges,Algorithm,Time_ms,Time_us,NumRuns,StdDev_ms,Status,Error
-Exp1_1,Grid5x5,25,40,Breaking,5.923,5923.1,10,1.127,PASS,
-Exp1_2,Grid10x10,100,180,Breaking,143.109,143108.6,10,29.737,PASS,
-Exp1_3,Star20,20,19,Breaking,1.542,1541.7,10,0.029,PASS,
-Exp1_4,Complete10,10,45,Breaking,1.142,1142.2,10,0.020,PASS,
+Exp1_1,Grid5x5,25,40,Breaking,3.608,3608.2,10,0.792,PASS,
+Exp1_2,Grid10x10,100,180,Breaking,106.866,106866.3,10,3.813,PASS,
+Exp1_3,Star20,20,19,Breaking,1.565,1564.6,10,0.047,PASS,
+Exp1_4,Complete10,10,45,Breaking,1.046,1045.7,10,0.046,PASS,

@@ -191,13 +191,18 @@ TopologyResult CreateGridWithSingleHelper(uint32_t nRows, uint32_t nCols,
 // ================================================================
 ScalabilityResult RunTest(const std::string &testName,
                           uint32_t gridSize,
-                          const std::string &baseNetwork)
+                          const std::string &baseNetwork,
+                          int testNum, int totalTests)
 {
     NS_LOG_UNCOND("================================================");
-    NS_LOG_UNCOND("Test: " << testName << " - " << gridSize << "x" << gridSize << " Grid");
+    NS_LOG_UNCOND("Test 2." << testNum << "/" << totalTests << ": " << gridSize << "x" << gridSize << " Grid");
     NS_LOG_UNCOND("================================================");
 
     TopologyResult topo = CreateGridWithSingleHelper(gridSize, gridSize, baseNetwork);
+
+    NS_LOG_UNCOND("  Topology: " << gridSize << "x" << gridSize << " Grid");
+    NS_LOG_UNCOND("  Nodes: " << (gridSize * gridSize) << ", Edges: " << topo.edges);
+    NS_LOG_UNCOND("  Running routing calculation...");
 
     // 使用计时函数运行，使用 RecomputeRoutingTables 进行多次测试
     TimingResult timing = TimeFunction([&]() {
@@ -210,18 +215,16 @@ ScalabilityResult RunTest(const std::string &testName,
     result.nodes = gridSize * gridSize;
     result.edges = topo.edges;
     result.density = (double)result.edges / result.nodes;
-    result.algorithm = "Breaking";  // Switched via make breaking/dijkstra
+    result.algorithm = "Dijkstra";  // 会被 Makefile 替换
     result.time_ms = timing.avg_time_ms;
     result.time_us = timing.avg_time_us;
     result.time_per_node_us = timing.avg_time_us / result.nodes;
     result.num_runs = timing.num_runs;
     result.std_dev_ms = timing.std_dev_ms;
 
-    NS_LOG_UNCOND("Nodes: " << result.nodes);
-    NS_LOG_UNCOND("Edges: " << result.edges);
-    NS_LOG_UNCOND("Time: " << result.time_ms << " ms (" << result.time_us << " us)");
-    NS_LOG_UNCOND("Time per node: " << result.time_per_node_us << " us");
-    NS_LOG_UNCOND("Runs: " << result.num_runs << ", StdDev: " << result.std_dev_ms << " ms");
+    NS_LOG_UNCOND("  Time: " << result.time_ms << " ms (" << result.time_us << " us)");
+    NS_LOG_UNCOND("  Runs: " << result.num_runs << ", StdDev: " << result.std_dev_ms << " ms");
+    NS_LOG_UNCOND("  Time per node: " << result.time_per_node_us << " us/node");
 
     return result;
 }
@@ -240,53 +243,66 @@ int main(int argc, char *argv[])
     csvFile << "TestName,Topology,Nodes,Edges,Density,Algorithm,Time_ms,Time_us,TimePerNode_us,NumRuns,StdDev_ms,Memory_kb"
             << std::endl;
 
+    // 定义总测试数
+    const int totalTests = 4;
+    int testNum = 1;
+
     NS_LOG_UNCOND("================================================");
-    NS_LOG_UNCOND("Scalability Test Suite (All in One Run)");
+    NS_LOG_UNCOND("Experiment 2: Scalability Test");
+    NS_LOG_UNCOND("Algorithm: Algorithm");  // 会被 Makefile 替换为 Breaking 或 Dijkstra
     NS_LOG_UNCOND("================================================");
 
     // ================================================================
     // 测试场景 2.1: 5x5 网格图 (25 节点)
     // ================================================================
     {
-        ScalabilityResult result = RunTest("Exp2_1", 5, "10.1.0.0");
+        ScalabilityResult result = RunTest("Exp2_1", 5, "10.1.0.0", testNum, totalTests);
         csvFile << result.ToCsv() << std::endl;
+        NS_LOG_UNCOND("");
 
         // 正确的清理顺序：先 Reset Ipv4AddressGenerator，再 Destroy Simulator
         Ipv4AddressGenerator::Reset();
         Simulator::Destroy();
+        testNum++;
     }
 
     // ================================================================
     // 测试场景 2.2: 10x10 网格图 (100 节点)
     // ================================================================
     {
-        ScalabilityResult result = RunTest("Exp2_2", 10, "20.1.0.0");
+        ScalabilityResult result = RunTest("Exp2_2", 10, "20.1.0.0", testNum, totalTests);
         csvFile << result.ToCsv() << std::endl;
+        NS_LOG_UNCOND("");
 
         Ipv4AddressGenerator::Reset();
         Simulator::Destroy();
+        testNum++;
     }
 
     // ================================================================
     // 测试场景 2.3: 15x15 网格图 (225 节点)
     // ================================================================
     {
-        ScalabilityResult result = RunTest("Exp2_3", 15, "30.1.0.0");
+        ScalabilityResult result = RunTest("Exp2_3", 15, "30.1.0.0", testNum, totalTests);
         csvFile << result.ToCsv() << std::endl;
+        NS_LOG_UNCOND("");
 
         Ipv4AddressGenerator::Reset();
         Simulator::Destroy();
+        testNum++;
     }
 
     // ================================================================
     // 测试场景 2.4: 20x20 网格图 (400 节点)
     // ================================================================
     {
-        ScalabilityResult result = RunTest("Exp2_4", 20, "40.1.0.0");
+        ScalabilityResult result = RunTest("Exp2_4", 20, "40.1.0.0", testNum, totalTests);
         csvFile << result.ToCsv() << std::endl;
+        NS_LOG_UNCOND("");
 
         Ipv4AddressGenerator::Reset();
         Simulator::Destroy();
+        testNum++;
     }
 
     // ================================================================
@@ -295,7 +311,7 @@ int main(int argc, char *argv[])
     csvFile.close();
 
     NS_LOG_UNCOND("================================================");
-    NS_LOG_UNCOND("All Scalability Tests Completed!");
+    NS_LOG_UNCOND("Scalability Test Completed!");
     NS_LOG_UNCOND("Results saved to: test-scalability-results.csv");
     NS_LOG_UNCOND("================================================");
 

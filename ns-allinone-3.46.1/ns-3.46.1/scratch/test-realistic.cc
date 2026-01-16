@@ -378,13 +378,10 @@ RealisticResult RunRealisticTest(const std::string &testName,
                                   const std::string &algorithm,
                                   const std::string &notes)
 {
-    NS_LOG_UNCOND("------------------------------------------------");
-    NS_LOG_UNCOND("Running: " << testName << " (" << scenario << ")");
-    NS_LOG_UNCOND("Topology: " << topologyType);
-    NS_LOG_UNCOND("Nodes: " << nodes << ", Edges: " << edges);
-    NS_LOG_UNCOND("Algorithm: " << algorithm);
-    NS_LOG_UNCOND("Notes: " << notes);
-    NS_LOG_UNCOND("------------------------------------------------");
+    NS_LOG_UNCOND("  Topology: " << topologyType);
+    NS_LOG_UNCOND("  Nodes: " << nodes << ", Edges: " << edges);
+    NS_LOG_UNCOND("  Notes: " << notes);
+    NS_LOG_UNCOND("  Running routing calculation...");
 
     // 使用计时函数运行，使用 RecomputeRoutingTables 进行多次测试
     TimingResult timing = TimeFunction([&]() {
@@ -397,7 +394,7 @@ RealisticResult RunRealisticTest(const std::string &testName,
     result.topologyType = topologyType;
     result.nodes = nodes;
     result.edges = edges;
-    result.algorithm = "Breaking";  // Switched via make breaking/dijkstra
+    result.algorithm = "Dijkstra";  // 会被 Makefile 替换
     result.time_ms = timing.avg_time_ms;
     result.time_us = timing.avg_time_us;
     result.time_per_node_us = timing.avg_time_us / nodes;
@@ -405,9 +402,9 @@ RealisticResult RunRealisticTest(const std::string &testName,
     result.std_dev_ms = timing.std_dev_ms;
     result.notes = notes;
 
-    NS_LOG_UNCOND("Time: " << result.time_ms << " ms (" << result.time_us << " us)");
-    NS_LOG_UNCOND("Time per node: " << result.time_per_node_us << " us");
-    NS_LOG_UNCOND("Runs: " << result.num_runs << ", StdDev: " << result.std_dev_ms << " ms");
+    NS_LOG_UNCOND("  Time: " << result.time_ms << " ms (" << result.time_us << " us)");
+    NS_LOG_UNCOND("  Time per node: " << result.time_per_node_us << " us/node");
+    NS_LOG_UNCOND("  Runs: " << result.num_runs << ", StdDev: " << result.std_dev_ms << " ms");
 
     return result;
 }
@@ -432,20 +429,23 @@ int main(int argc, char *argv[])
     std::ofstream csvFile("test-realistic-results.csv");
     csvFile << CSV_HEADER << std::endl;
 
+    // 定义总测试数（不包括可选的大规模测试）
+    const int totalTests = 3;
+    int testNum = 1;
+
     NS_LOG_UNCOND("================================================");
     NS_LOG_UNCOND("Experiment 5: Real-World Scenario Test");
+    NS_LOG_UNCOND("Algorithm: Algorithm");  // 会被 Makefile 替换为 Breaking 或 Dijkstra
     NS_LOG_UNCOND("Testing algorithm performance in realistic networks");
     NS_LOG_UNCOND("================================================");
     NS_LOG_UNCOND("");
-
-    int testNum = 1;
 
     // ================================================================
     // 测试场景 5.1: 数据中心 Fat-Tree (k=4)
     // ================================================================
     {
         NS_LOG_UNCOND("================================================");
-        NS_LOG_UNCOND("Test 5." << testNum << ": Data Center (Fat-Tree)");
+        NS_LOG_UNCOND("Test 5." << testNum << "/" << totalTests << ": Data Center (Fat-Tree)");
         NS_LOG_UNCOND("================================================");
 
         // 重置模拟环境以清除之前的 IP 地址分配
@@ -462,7 +462,7 @@ int main(int argc, char *argv[])
 
         RealisticResult result = RunRealisticTest(
             testName, "DataCenter", "Fat-Tree_k4",
-            nSwitches, edges, "Breaking",
+            nSwitches, edges, "Dijkstra",
             "k=4 Fat-Tree, typical small DC topology");
         csvFile << result.ToCsv() << std::endl;
 
@@ -475,7 +475,7 @@ int main(int argc, char *argv[])
     // ================================================================
     {
         NS_LOG_UNCOND("================================================");
-        NS_LOG_UNCOND("Test 5." << testNum << ": Campus Network");
+        NS_LOG_UNCOND("Test 5." << testNum << "/" << totalTests << ": Campus Network");
         NS_LOG_UNCOND("================================================");
 
         // 重置模拟环境以清除之前的 IP 地址分配
@@ -492,7 +492,7 @@ int main(int argc, char *argv[])
 
         RealisticResult result = RunRealisticTest(
             testName, "Campus", "Hierarchical_3-Tier",
-            nSwitches, edges, "Breaking",
+            nSwitches, edges, "Dijkstra",
             "3-tier hierarchy: Core-Building-Floor");
         csvFile << result.ToCsv() << std::endl;
 
@@ -505,7 +505,7 @@ int main(int argc, char *argv[])
     // ================================================================
     {
         NS_LOG_UNCOND("================================================");
-        NS_LOG_UNCOND("Test 5." << testNum << ": ISP Backbone");
+        NS_LOG_UNCOND("Test 5." << testNum << "/" << totalTests << ": ISP Backbone");
         NS_LOG_UNCOND("================================================");
 
         // 重置模拟环境以清除之前的 IP 地址分配
@@ -520,7 +520,7 @@ int main(int argc, char *argv[])
 
         RealisticResult result = RunRealisticTest(
             testName, "ISP", "High-Degree_Mesh",
-            nRouters, edges, "Breaking",
+            nRouters, edges, "Dijkstra",
             "Mesh topology with degree=4");
         csvFile << result.ToCsv() << std::endl;
 
@@ -548,7 +548,7 @@ int main(int argc, char *argv[])
 
             RealisticResult result = RunRealisticTest(
                 testName, "DataCenter_Large", "Fat-Tree_k8",
-                nSwitches, edges, "Breaking",
+                nSwitches, edges, "Dijkstra",
                 "k=8 Fat-Tree, larger DC topology");
             csvFile << result.ToCsv() << std::endl;
 

@@ -535,7 +535,7 @@ GlobalRouteManagerLSDB::GetLSAByLinkData(Ipv4Address addr) const
 
 GlobalRouteManagerImpl::GlobalRouteManagerImpl()
     : m_spfroot(nullptr),
-      m_useBmssp(true)  // Default: Dijkstra (switched via make breaking/dijkstra)
+      m_useBmssp(false)  // Default: Dijkstra (switched via make breaking/dijkstra)
 {
     NS_LOG_FUNCTION(this);
     m_lsdb = new GlobalRouteManagerLSDB();

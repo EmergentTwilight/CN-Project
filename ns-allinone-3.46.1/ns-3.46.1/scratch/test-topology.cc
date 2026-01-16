@@ -299,12 +299,9 @@ TopologyResult RunTopologyTest(const std::string &testName,
                                 uint32_t nodes, uint32_t edges,
                                 const std::string &algorithm)
 {
-    NS_LOG_UNCOND("------------------------------------------------");
-    NS_LOG_UNCOND("Running: " << testName << " (" << topologyType << ")");
-    NS_LOG_UNCOND("Description: " << topologyDesc);
-    NS_LOG_UNCOND("Nodes: " << nodes << ", Edges: " << edges);
-    NS_LOG_UNCOND("Algorithm: " << algorithm);
-    NS_LOG_UNCOND("------------------------------------------------");
+    NS_LOG_UNCOND("  Topology: " << topologyType);
+    NS_LOG_UNCOND("  Nodes: " << nodes << ", Edges: " << edges);
+    NS_LOG_UNCOND("  Running routing calculation...");
 
     // 使用计时函数运行，使用 RecomputeRoutingTables 进行多次测试
     TimingResult timing = TimeFunction([&]() {
@@ -318,14 +315,15 @@ TopologyResult RunTopologyTest(const std::string &testName,
     result.nodes = nodes;
     result.edges = edges;
     result.avgPathLength = 0; // 需要额外计算，暂设为 0
-    result.algorithm = "Breaking";  // Switched via make breaking/dijkstra
+    result.algorithm = "Dijkstra";  // 会被 Makefile 替换
     result.time_ms = timing.avg_time_ms;
     result.time_us = timing.avg_time_us;
     result.num_runs = timing.num_runs;
     result.std_dev_ms = timing.std_dev_ms;
 
-    NS_LOG_UNCOND("Time: " << result.time_ms << " ms (" << result.time_us << " us)");
-    NS_LOG_UNCOND("Runs: " << result.num_runs << ", StdDev: " << result.std_dev_ms << " ms");
+    NS_LOG_UNCOND("  Time: " << result.time_ms << " ms (" << result.time_us << " us)");
+    NS_LOG_UNCOND("  Runs: " << result.num_runs << ", StdDev: " << result.std_dev_ms << " ms");
+    NS_LOG_UNCOND("  Time per node: " << (result.time_us / nodes) << " us/node");
 
     return result;
 }
@@ -350,20 +348,23 @@ int main(int argc, char *argv[])
     std::ofstream csvFile("test-topology-results.csv");
     csvFile << CSV_HEADER << std::endl;
 
+    // 定义总测试数
+    const int totalTests = 4;
+    int testNum = 1;
+
     NS_LOG_UNCOND("================================================");
     NS_LOG_UNCOND("Experiment 4: Topology Type Test");
+    NS_LOG_UNCOND("Algorithm: Algorithm");  // 会被 Makefile 替换为 Breaking 或 Dijkstra
     NS_LOG_UNCOND("Testing algorithm performance across different topologies");
     NS_LOG_UNCOND("================================================");
     NS_LOG_UNCOND("");
-
-    int testNum = 1;
 
     // ================================================================
     // 测试场景 4.1: 网格图
     // ================================================================
     {
         NS_LOG_UNCOND("================================================");
-        NS_LOG_UNCOND("Test 4." << testNum << ": Grid Topology");
+        NS_LOG_UNCOND("Test 4." << testNum << "/" << totalTests << ": Grid Topology");
         NS_LOG_UNCOND("================================================");
 
         // 重置模拟环境以清除之前的 IP 地址分配
@@ -376,7 +377,7 @@ int main(int argc, char *argv[])
         std::string testName = "Exp4_" + std::to_string(testNum);
 
         TopologyResult result = RunTopologyTest(
-            testName, "Grid", "2D Regular Grid", n * n, edges, "Breaking");
+            testName, "Grid", "2D Regular Grid", n * n, edges, "Dijkstra");
         csvFile << result.ToCsv() << std::endl;
 
         NS_LOG_UNCOND("");
@@ -388,7 +389,7 @@ int main(int argc, char *argv[])
     // ================================================================
     {
         NS_LOG_UNCOND("================================================");
-        NS_LOG_UNCOND("Test 4." << testNum << ": Random Topology");
+        NS_LOG_UNCOND("Test 4." << testNum << "/" << totalTests << ": Random Topology");
         NS_LOG_UNCOND("================================================");
 
         // 重置模拟环境以清除之前的 IP 地址分配
@@ -400,7 +401,7 @@ int main(int argc, char *argv[])
         std::string testName = "Exp4_" + std::to_string(testNum);
 
         TopologyResult result = RunTopologyTest(
-            testName, "Random", "Erdős-Rényi Random Graph", nNodes, edges, "Breaking");
+            testName, "Random", "Erdős-Rényi Random Graph", nNodes, edges, "Dijkstra");
         csvFile << result.ToCsv() << std::endl;
 
         NS_LOG_UNCOND("");
@@ -412,7 +413,7 @@ int main(int argc, char *argv[])
     // ================================================================
     {
         NS_LOG_UNCOND("================================================");
-        NS_LOG_UNCOND("Test 4." << testNum << ": Star Topology");
+        NS_LOG_UNCOND("Test 4." << testNum << "/" << totalTests << ": Star Topology");
         NS_LOG_UNCOND("================================================");
 
         // 重置模拟环境以清除之前的 IP 地址分配
@@ -424,7 +425,7 @@ int main(int argc, char *argv[])
         std::string testName = "Exp4_" + std::to_string(testNum);
 
         TopologyResult result = RunTopologyTest(
-            testName, "Star", "Central Hub Topology", nNodes, edges, "Breaking");
+            testName, "Star", "Central Hub Topology", nNodes, edges, "Dijkstra");
         csvFile << result.ToCsv() << std::endl;
 
         NS_LOG_UNCOND("");
@@ -436,7 +437,7 @@ int main(int argc, char *argv[])
     // ================================================================
     {
         NS_LOG_UNCOND("================================================");
-        NS_LOG_UNCOND("Test 4." << testNum << ": Tree Topology");
+        NS_LOG_UNCOND("Test 4." << testNum << "/" << totalTests << ": Tree Topology");
         NS_LOG_UNCOND("================================================");
 
         // 重置模拟环境以清除之前的 IP 地址分配
@@ -448,7 +449,7 @@ int main(int argc, char *argv[])
         std::string testName = "Exp4_" + std::to_string(testNum);
 
         TopologyResult result = RunTopologyTest(
-            testName, "Tree", "Binary Tree Structure", nNodes, edges, "Breaking");
+            testName, "Tree", "Binary Tree Structure", nNodes, edges, "Dijkstra");
         csvFile << result.ToCsv() << std::endl;
 
         NS_LOG_UNCOND("");

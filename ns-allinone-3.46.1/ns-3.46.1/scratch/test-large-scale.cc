@@ -518,6 +518,7 @@ int main(int argc, char* argv[])
 
     std::cout << "================================================================" << std::endl;
     std::cout << "Breaking Algorithm Large-Scale Performance Test" << std::endl;
+    std::cout << "Algorithm: Algorithm" << std::endl;  // 会被 Makefile 替换为 Breaking 或 Dijkstra
     std::cout << "================================================================" << std::endl;
     std::cout << "Mode: " << (quickMode ? "Quick (small scale)" : "Full (progressive)") << std::endl;
     std::cout << "Output: " << outputFile << std::endl;
@@ -636,7 +637,7 @@ int main(int argc, char* argv[])
             result.nodes = nNodes;
             result.edges = topo.edgeCount;
             result.density = density;
-            result.algorithm = "Breaking";
+            result.algorithm = "Dijkstra";  // 会被 Makefile 替换为 Breaking 或 Dijkstra
             result.time_ms = timing.avg_time_ms;
             result.time_us = timing.avg_time_us;
             result.time_per_node_us = timing.avg_time_us / nNodes;

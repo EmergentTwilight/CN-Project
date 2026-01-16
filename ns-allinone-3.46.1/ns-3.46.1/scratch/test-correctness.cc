@@ -246,12 +246,22 @@ int main(int argc, char *argv[])
     std::ofstream csvFile("test-correctness-results.csv");
     csvFile << CSV_HEADER << std::endl;
 
+    // 定义总测试数
+    const int totalTests = 4;
+    int testNum = 1;
+
+    NS_LOG_UNCOND("================================================");
+    NS_LOG_UNCOND("Experiment 1: Correctness Verification Test");
+    NS_LOG_UNCOND("Algorithm: Algorithm");  // 会被 Makefile 替换为 Breaking 或 Dijkstra
+    NS_LOG_UNCOND("================================================");
+    NS_LOG_UNCOND("");
+
     // ================================================================
     // 测试场景 1.1: 5x5 网格图 (25 节点)
     // ================================================================
     {
         NS_LOG_UNCOND("================================================");
-        NS_LOG_UNCOND("Test 1.1: 5x5 Grid Topology (25 nodes)");
+        NS_LOG_UNCOND("Test 1.1/" << totalTests << ": 5x5 Grid Topology (25 nodes)");
         NS_LOG_UNCOND("================================================");
 
         // 重置模拟环境以清除之前的 IP 地址分配
@@ -263,21 +273,26 @@ int main(int argc, char *argv[])
 
         CreateGridTopology(nRows, nCols, nodes, edgeCount);
 
+        NS_LOG_UNCOND("  Topology: " << nRows << "x" << nCols << " Grid");
+        NS_LOG_UNCOND("  Nodes: " << (nRows * nCols) << ", Edges: " << edgeCount);
+        NS_LOG_UNCOND("  Running routing calculation...");
+
         // 使用计时函数运行
         TimingResult timing = TimeFunction([&]() {
             // 每次运行前需要清理路由表
             Ipv4GlobalRoutingHelper::RecomputeRoutingTables();
         });
 
-        NS_LOG_UNCOND("Time: " << timing.avg_time_ms << " ms (" << timing.avg_time_us << " us)");
-        NS_LOG_UNCOND("Runs: " << timing.num_runs << ", StdDev: " << timing.std_dev_ms << " ms");
+        NS_LOG_UNCOND("  Time: " << timing.avg_time_ms << " ms (" << timing.avg_time_us << " us)");
+        NS_LOG_UNCOND("  Runs: " << timing.num_runs << ", StdDev: " << timing.std_dev_ms << " ms");
+        NS_LOG_UNCOND("  Time per node: " << (timing.avg_time_us / (nRows * nCols)) << " us/node");
 
         TestResult result;
         result.testName = "Exp1_1";
         result.topology = "Grid5x5";
         result.nodes = nRows * nCols;
         result.edges = edgeCount;
-        result.algorithm = "Breaking";  // Switched via make breaking/dijkstra
+        result.algorithm = "Dijkstra";  // 会被 Makefile 替换
         result.time_ms = timing.avg_time_ms;
         result.time_us = timing.avg_time_us;
         result.num_runs = timing.num_runs;
@@ -285,7 +300,8 @@ int main(int argc, char *argv[])
         result.passed = true;
 
         csvFile << result.ToCsv() << std::endl;
-        NS_LOG_UNCOND("Result: " << (result.passed ? "PASS" : "FAIL"));
+        NS_LOG_UNCOND("  Result: " << (result.passed ? "PASS" : "FAIL"));
+        NS_LOG_UNCOND("");
     }
 
     // ================================================================
@@ -293,7 +309,7 @@ int main(int argc, char *argv[])
     // ================================================================
     {
         NS_LOG_UNCOND("================================================");
-        NS_LOG_UNCOND("Test 1.2: 10x10 Grid Topology (100 nodes)");
+        NS_LOG_UNCOND("Test 1.2/" << totalTests << ": 10x10 Grid Topology (100 nodes)");
         NS_LOG_UNCOND("================================================");
 
         // 重置模拟环境
@@ -305,19 +321,24 @@ int main(int argc, char *argv[])
 
         CreateGridTopology(nRows, nCols, nodes, edgeCount);
 
+        NS_LOG_UNCOND("  Topology: " << nRows << "x" << nCols << " Grid");
+        NS_LOG_UNCOND("  Nodes: " << (nRows * nCols) << ", Edges: " << edgeCount);
+        NS_LOG_UNCOND("  Running routing calculation...");
+
         TimingResult timing = TimeFunction([&]() {
             Ipv4GlobalRoutingHelper::RecomputeRoutingTables();
         });
 
-        NS_LOG_UNCOND("Time: " << timing.avg_time_ms << " ms (" << timing.avg_time_us << " us)");
-        NS_LOG_UNCOND("Runs: " << timing.num_runs << ", StdDev: " << timing.std_dev_ms << " ms");
+        NS_LOG_UNCOND("  Time: " << timing.avg_time_ms << " ms (" << timing.avg_time_us << " us)");
+        NS_LOG_UNCOND("  Runs: " << timing.num_runs << ", StdDev: " << timing.std_dev_ms << " ms");
+        NS_LOG_UNCOND("  Time per node: " << (timing.avg_time_us / (nRows * nCols)) << " us/node");
 
         TestResult result;
         result.testName = "Exp1_2";
         result.topology = "Grid10x10";
         result.nodes = nRows * nCols;
         result.edges = edgeCount;
-        result.algorithm = "Breaking";  // Switched via make breaking/dijkstra
+        result.algorithm = "Dijkstra";  // 会被 Makefile 替换
         result.time_ms = timing.avg_time_ms;
         result.time_us = timing.avg_time_us;
         result.num_runs = timing.num_runs;
@@ -325,7 +346,8 @@ int main(int argc, char *argv[])
         result.passed = true;
 
         csvFile << result.ToCsv() << std::endl;
-        NS_LOG_UNCOND("Result: " << (result.passed ? "PASS" : "FAIL"));
+        NS_LOG_UNCOND("  Result: " << (result.passed ? "PASS" : "FAIL"));
+        NS_LOG_UNCOND("");
     }
 
     // ================================================================
@@ -333,7 +355,7 @@ int main(int argc, char *argv[])
     // ================================================================
     {
         NS_LOG_UNCOND("================================================");
-        NS_LOG_UNCOND("Test 1.3: Star Topology (20 nodes)");
+        NS_LOG_UNCOND("Test 1.3/" << totalTests << ": Star Topology (20 nodes)");
         NS_LOG_UNCOND("================================================");
 
         // 重置模拟环境
@@ -345,19 +367,24 @@ int main(int argc, char *argv[])
 
         CreateStarTopology(nNodes, nodes, edgeCount);
 
+        NS_LOG_UNCOND("  Topology: Star");
+        NS_LOG_UNCOND("  Nodes: " << nNodes << ", Edges: " << edgeCount);
+        NS_LOG_UNCOND("  Running routing calculation...");
+
         TimingResult timing = TimeFunction([&]() {
             Ipv4GlobalRoutingHelper::RecomputeRoutingTables();
         });
 
-        NS_LOG_UNCOND("Time: " << timing.avg_time_ms << " ms (" << timing.avg_time_us << " us)");
-        NS_LOG_UNCOND("Runs: " << timing.num_runs << ", StdDev: " << timing.std_dev_ms << " ms");
+        NS_LOG_UNCOND("  Time: " << timing.avg_time_ms << " ms (" << timing.avg_time_us << " us)");
+        NS_LOG_UNCOND("  Runs: " << timing.num_runs << ", StdDev: " << timing.std_dev_ms << " ms");
+        NS_LOG_UNCOND("  Time per node: " << (timing.avg_time_us / nNodes) << " us/node");
 
         TestResult result;
         result.testName = "Exp1_3";
         result.topology = "Star20";
         result.nodes = nNodes;
         result.edges = edgeCount;
-        result.algorithm = "Breaking";  // Switched via make breaking/dijkstra
+        result.algorithm = "Dijkstra";  // 会被 Makefile 替换
         result.time_ms = timing.avg_time_ms;
         result.time_us = timing.avg_time_us;
         result.num_runs = timing.num_runs;
@@ -365,7 +392,8 @@ int main(int argc, char *argv[])
         result.passed = true;
 
         csvFile << result.ToCsv() << std::endl;
-        NS_LOG_UNCOND("Result: " << (result.passed ? "PASS" : "FAIL"));
+        NS_LOG_UNCOND("  Result: " << (result.passed ? "PASS" : "FAIL"));
+        NS_LOG_UNCOND("");
     }
 
     // ================================================================
@@ -373,7 +401,7 @@ int main(int argc, char *argv[])
     // ================================================================
     {
         NS_LOG_UNCOND("================================================");
-        NS_LOG_UNCOND("Test 1.4: Complete Graph Topology (10 nodes)");
+        NS_LOG_UNCOND("Test 1.4/" << totalTests << ": Complete Graph Topology (10 nodes)");
         NS_LOG_UNCOND("================================================");
 
         // 重置模拟环境
@@ -385,19 +413,24 @@ int main(int argc, char *argv[])
 
         CreateCompleteGraph(nNodes, nodes, edgeCount);
 
+        NS_LOG_UNCOND("  Topology: Complete Graph");
+        NS_LOG_UNCOND("  Nodes: " << nNodes << ", Edges: " << edgeCount);
+        NS_LOG_UNCOND("  Running routing calculation...");
+
         TimingResult timing = TimeFunction([&]() {
             Ipv4GlobalRoutingHelper::RecomputeRoutingTables();
         });
 
-        NS_LOG_UNCOND("Time: " << timing.avg_time_ms << " ms (" << timing.avg_time_us << " us)");
-        NS_LOG_UNCOND("Runs: " << timing.num_runs << ", StdDev: " << timing.std_dev_ms << " ms");
+        NS_LOG_UNCOND("  Time: " << timing.avg_time_ms << " ms (" << timing.avg_time_us << " us)");
+        NS_LOG_UNCOND("  Runs: " << timing.num_runs << ", StdDev: " << timing.std_dev_ms << " ms");
+        NS_LOG_UNCOND("  Time per node: " << (timing.avg_time_us / nNodes) << " us/node");
 
         TestResult result;
         result.testName = "Exp1_4";
         result.topology = "Complete10";
         result.nodes = nNodes;
         result.edges = edgeCount;
-        result.algorithm = "Breaking";  // Switched via make breaking/dijkstra
+        result.algorithm = "Dijkstra";  // 会被 Makefile 替换
         result.time_ms = timing.avg_time_ms;
         result.time_us = timing.avg_time_us;
         result.num_runs = timing.num_runs;
@@ -405,7 +438,8 @@ int main(int argc, char *argv[])
         result.passed = true;
 
         csvFile << result.ToCsv() << std::endl;
-        NS_LOG_UNCOND("Result: " << (result.passed ? "PASS" : "FAIL"));
+        NS_LOG_UNCOND("  Result: " << (result.passed ? "PASS" : "FAIL"));
+        NS_LOG_UNCOND("");
     }
 
     // ================================================================

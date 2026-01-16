@@ -23,6 +23,7 @@
 #include "ns3/applications-module.h"
 #include "ns3/ipv4-global-routing-helper.h"
 #include "ns3/ipv4-address-generator.h"
+#include "ns3/global-route-manager.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -47,7 +48,9 @@ struct DensityResult
     std::string topology;
     uint32_t nodes;
     uint32_t edges;
+    uint32_t actualEdges;  // 实际创建的边数
     double density; // m/n ratio
+    double actualDensity;  // 实际密度
     std::string densityLevel;
     std::string algorithm;
     double time_ms;
@@ -60,7 +63,9 @@ struct DensityResult
     {
         std::stringstream ss;
         ss << testName << "," << topology << "," << nodes << "," << edges << ","
+           << actualEdges << ","
            << std::fixed << std::setprecision(2) << density << ","
+           << std::fixed << std::setprecision(2) << actualDensity << ","
            << densityLevel << "," << algorithm << ","
            << std::fixed << std::setprecision(3) << time_ms << ","
            << std::fixed << std::setprecision(1) << time_us << ","
@@ -74,7 +79,7 @@ struct DensityResult
 // CSV 头部
 // ================================================================
 const std::string CSV_HEADER =
-    "TestName,Topology,Nodes,Edges,Density,DensityLevel,Algorithm,Time_ms,Time_us,Speedup,NumRuns,StdDev_ms";
+    "TestName,Topology,Nodes,ExpectedEdges,ActualEdges,ExpectedDensity,ActualDensity,DensityLevel,Algorithm,Time_ms,Time_us,Speedup,NumRuns,StdDev_ms";
 
 // ================================================================
 // 计时和统计辅助函数
@@ -146,7 +151,7 @@ TimingResult TimeFunction(std::function<void()> func,
 }
 
 // ================================================================
-// 创建随机拓扑
+// 创建随机拓扑（不计时）
 // ================================================================
 uint32_t CreateRandomTopology(uint32_t nNodes, double probability,
                                NodeContainer &nodes)
@@ -163,10 +168,11 @@ uint32_t CreateRandomTopology(uint32_t nNodes, double probability,
     uint32_t linkIndex = 0;
     uint32_t edgeCount = 0;
 
-    // 使用随机数生成器
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    // 使用随机数生成器（固定种子以保持一致性）
+    std::mt19937 gen(42); // 固定种子
     std::uniform_real_distribution<> dis(0.0, 1.0);
+
+    NS_LOG_UNCOND("  Creating random edges...");
 
     // 创建边（无向图，只创建 i < j 的边）
     for (uint32_t i = 0; i < nNodes; i++)
@@ -189,11 +195,12 @@ uint32_t CreateRandomTopology(uint32_t nNodes, double probability,
         }
     }
 
+    NS_LOG_UNCOND("  Random edges created: " << edgeCount);
+
     // 确保图是连通的（添加最小生成树）
-    // 这是一个简单的连通性保证：将所有节点连成一条链
+    NS_LOG_UNCOND("  Adding connectivity edges...");
     for (uint32_t i = 0; i < nNodes - 1; i++)
     {
-        // 这里简化处理，直接创建新边（可能有重复，但不影响路由）
         NetDeviceContainer devices = p2p.Install(nodes.Get(i), nodes.Get(i + 1));
 
         Ipv4AddressHelper address;
@@ -206,7 +213,28 @@ uint32_t CreateRandomTopology(uint32_t nNodes, double probability,
         edgeCount++;
     }
 
+    NS_LOG_UNCOND("  Total edges: " << edgeCount << " (including connectivity)");
+
     return edgeCount;
+}
+
+// ================================================================
+// 获取当前算法名称
+// ================================================================
+std::string GetAlgorithmName()
+{
+    // 检查 GlobalRouteManagerImpl 的 m_useBmssp 状态
+    // 这是一个间接的方法，通过运行一个小测试来确定
+    // 但更简单的方法是让用户通过 Makefile 来设置
+
+    // 由于我们无法直接访问 m_useBmssp，我们使用一个间接的方法
+    // 或者简单地从环境变量/编译时设置中获取
+
+    // 这里我们假设 Makefile 已经正确设置了
+    // 实际的算法名称由 Makefile 中的 sed 命令修改
+
+    // 返回一个占位符，实际会在输出时被 Makefile 修改
+    return "Dijkstra";  // 会被 Makefile 替换为 "Breaking" 或 "Dijkstra"
 }
 
 // ================================================================
@@ -214,97 +242,66 @@ uint32_t CreateRandomTopology(uint32_t nNodes, double probability,
 // ================================================================
 DensityResult RunDensityTest(const std::string &testName,
                               const std::string &densityLevel,
-                              uint32_t nodes, uint32_t edges,
-                              double density,
+                              uint32_t nodes, uint32_t expectedEdges,
+                              double expectedDensity,
                               const std::string &algorithm,
-                              double probability)
+                              double probability,
+                              int testNum, int totalTests)
 {
-    NS_LOG_UNCOND("------------------------------------------------");
-    NS_LOG_UNCOND("Running: " << testName << " (" << densityLevel << ")");
-    NS_LOG_UNCOND("Nodes: " << nodes << ", Edges: " << edges);
-    NS_LOG_UNCOND("Density (m/n): " << std::fixed << std::setprecision(2) << density);
+    NS_LOG_UNCOND("================================================");
+    NS_LOG_UNCOND("Test 3." << testNum << "/" << totalTests << ": " << densityLevel << " Graph");
     NS_LOG_UNCOND("Algorithm: " << algorithm);
-    NS_LOG_UNCOND("------------------------------------------------");
+    NS_LOG_UNCOND("Target: " << nodes << " nodes, ~" << expectedEdges << " edges (density ≈ " << expectedDensity << ")");
+    NS_LOG_UNCOND("================================================");
 
-    // 使用计时函数运行，需要重新创建拓扑因为 PopulateRoutingTables 只能执行一次
+    // 重置模拟环境
+    Simulator::Destroy();
+    Ipv4AddressGenerator::Reset();
+
+    // 第一步：创建网络拓扑（不计时）
+    NS_LOG_UNCOND("[Phase 1] Creating network topology...");
+    NodeContainer nodesContainer;
+    uint32_t actualEdges = CreateRandomTopology(nodes, probability, nodesContainer);
+    double actualDensity = (double)actualEdges / nodes;
+
+    NS_LOG_UNCOND("  Topology created successfully");
+    NS_LOG_UNCOND("  Actual edges: " << actualEdges << ", Actual density: " << std::fixed << std::setprecision(2) << actualDensity);
+
+    // 第二步：初始化路由表（首次调用，不计时）
+    NS_LOG_UNCOND("[Phase 2] Initializing routing tables...");
+    Ipv4GlobalRoutingHelper::PopulateRoutingTables();
+    NS_LOG_UNCOND("  Routing tables initialized");
+
+    // 第三步：只计时路由计算部分（使用 RecomputeRoutingTables）
+    NS_LOG_UNCOND("[Phase 3] Measuring routing calculation performance...");
     TimingResult timing = TimeFunction([&]() {
-        // 每次运行需要重新创建网络拓扑
-        Simulator::Destroy();
-        Ipv4AddressGenerator::Reset();
-
-        PointToPointHelper p2p;
-        p2p.SetDeviceAttribute("DataRate", StringValue("5Mbps"));
-        p2p.SetChannelAttribute("Delay", StringValue("2ms"));
-
-        NodeContainer tempNodes;
-        tempNodes.Create(nodes);
-
-        InternetStackHelper stack;
-        stack.Install(tempNodes);
-
-        uint32_t linkIndex = 0;
-
-        // 使用随机数生成器（固定种子以保持一致性）
-        std::mt19937 gen(42); // 固定种子
-        std::uniform_real_distribution<> dis(0.0, 1.0);
-
-        // 创建边（无向图，只创建 i < j 的边）
-        for (uint32_t i = 0; i < nodes; i++)
-        {
-            for (uint32_t j = i + 1; j < nodes; j++)
-            {
-                if (dis(gen) < probability)
-                {
-                    NetDeviceContainer devices = p2p.Install(tempNodes.Get(i), tempNodes.Get(j));
-
-                    Ipv4AddressHelper address;
-                    std::stringstream subnet;
-                    subnet << "10." << (linkIndex / 256) << "." << (linkIndex % 256) << ".0";
-                    address.SetBase(subnet.str().c_str(), "255.255.255.0");
-
-                    Ipv4InterfaceContainer interfaces = address.Assign(devices);
-                    linkIndex++;
-                }
-            }
-        }
-
-        // 确保图是连通的（添加最小生成树）
-        for (uint32_t i = 0; i < nodes - 1; i++)
-        {
-            NetDeviceContainer devices = p2p.Install(tempNodes.Get(i), tempNodes.Get(i + 1));
-
-            Ipv4AddressHelper address;
-            std::stringstream subnet;
-            subnet << "10." << (linkIndex / 256) << "." << (linkIndex % 256) << ".0";
-            address.SetBase(subnet.str().c_str(), "255.255.255.0");
-
-            Ipv4InterfaceContainer interfaces = address.Assign(devices);
-            linkIndex++;
-        }
-
-        // 计算路由表
-        Ipv4GlobalRoutingHelper::PopulateRoutingTables();
-
-        // 清理
-        Simulator::Destroy();
+        Ipv4GlobalRoutingHelper::RecomputeRoutingTables();
     });
 
+    // 清理
+    Simulator::Destroy();
+
+    // 构建结果
     DensityResult result;
     result.testName = testName;
     result.topology = "Random";
     result.nodes = nodes;
-    result.edges = edges;
-    result.density = density;
+    result.edges = expectedEdges;
+    result.actualEdges = actualEdges;
+    result.density = expectedDensity;
+    result.actualDensity = actualDensity;
     result.densityLevel = densityLevel;
-    result.algorithm = "Breaking";  // Switched via make breaking/dijkstra
+    result.algorithm = algorithm;
     result.time_ms = timing.avg_time_ms;
     result.time_us = timing.avg_time_us;
     result.num_runs = timing.num_runs;
     result.std_dev_ms = timing.std_dev_ms;
     result.speedup = 1.0; // 需要对比数据计算
 
-    NS_LOG_UNCOND("Time: " << result.time_ms << " ms (" << result.time_us << " us)");
-    NS_LOG_UNCOND("Runs: " << result.num_runs << ", StdDev: " << result.std_dev_ms << " ms");
+    NS_LOG_UNCOND("  Result: " << result.time_ms << " ms (" << result.time_us << " us)");
+    NS_LOG_UNCOND("  Runs: " << result.num_runs << ", StdDev: " << result.std_dev_ms << " ms");
+    NS_LOG_UNCOND("  Time per node: " << (result.time_us / nodes) << " us/node");
+    NS_LOG_UNCOND("================================================");
 
     return result;
 }
@@ -314,10 +311,14 @@ DensityResult RunDensityTest(const std::string &testName,
 // ================================================================
 int main(int argc, char *argv[])
 {
-    // 禁用详细日志
+    // Log 配置
     LogComponentEnable("UdpEchoClientApplication", LOG_LEVEL_ERROR);
     LogComponentEnable("UdpEchoServerApplication", LOG_LEVEL_ERROR);
     LogComponentEnable("DensityTest", LOG_LEVEL_INFO);
+
+    // 可选：启用 GlobalRouting 的详细日志（用于调试）
+    // LogComponentEnable("GlobalRouteManager", LOG_LEVEL_ALL);
+    // LogComponentEnable("GlobalRouteManagerImpl", LOG_LEVEL_ALL);
 
     // 命令行参数
     uint32_t nNodes = 100; // 默认节点数
@@ -356,28 +357,21 @@ int main(int argc, char *argv[])
         {"UltraDense", 0.40, 20.0}  // m ≈ 20n
     };
 
+    int totalTests = densityConfigs.size();
     int testNum = 1;
+
     for (const auto &config : densityConfigs)
     {
-        NS_LOG_UNCOND("================================================");
-        NS_LOG_UNCOND("Test 3." << testNum << ": " << config.level << " Graph");
-        NS_LOG_UNCOND("Target density: m/n ≈ " << config.targetDensity);
-        NS_LOG_UNCOND("Connection probability: " << config.probability);
-        NS_LOG_UNCOND("================================================");
-
-        // 重置模拟环境以清除之前的 IP 地址分配
-        Simulator::Destroy();
-        Ipv4AddressGenerator::Reset();
-
         // 计算预期边数（用于记录）
         uint32_t expectedEdges = (uint32_t)(config.targetDensity * nNodes);
         double expectedDensity = config.targetDensity;
 
         std::string testName = "Exp3_" + std::to_string(testNum);
 
-        // 运行 Breaking 算法测试（内部会创建拓扑并计时）
+        // 运行测试（内部会创建拓扑、初始化路由、计时重新计算）
         DensityResult result = RunDensityTest(
-            testName, config.level, nNodes, expectedEdges, expectedDensity, "Breaking", config.probability);
+            testName, config.level, nNodes, expectedEdges, expectedDensity,
+            "Dijkstra", config.probability, testNum, totalTests);  // "Dijkstra" 会被 Makefile 替换
         csvFile << result.ToCsv() << std::endl;
 
         NS_LOG_UNCOND("");
@@ -390,16 +384,14 @@ int main(int argc, char *argv[])
     // ================================================================
     csvFile.close();
 
-    NS_LOG_UNCOND("");
     NS_LOG_UNCOND("================================================");
     NS_LOG_UNCOND("Density Test Completed!");
     NS_LOG_UNCOND("Results saved to: test-density-results.csv");
     NS_LOG_UNCOND("");
     NS_LOG_UNCOND("To complete the comparison:");
-    NS_LOG_UNCOND("  1. Switch algorithm: m_useBmssp = false (Dijkstra)");
-    NS_LOG_UNCOND("  2. Recompile: make build");
-    NS_LOG_UNCOND("  3. Run again: make run PROGRAM=test-density");
-    NS_LOG_UNCOND("  4. Calculate speedup: Time_Dijkstra / Time_Breaking");
+    NS_LOG_UNCOND("  1. Switch algorithm: make dijkstra");
+    NS_LOG_UNCOND("  2. Run again: make test-density");
+    NS_LOG_UNCOND("  3. Compare CSV results between Breaking and Dijkstra");
     NS_LOG_UNCOND("");
     NS_LOG_UNCOND("Expected Results:");
     NS_LOG_UNCOND("  - Breaking advantage increases with density");

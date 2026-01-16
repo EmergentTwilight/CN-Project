@@ -15,7 +15,7 @@
 NS3_DIR = ns-allinone-3.46.1/ns-3.46.1
 
 # Results directory
-RESULTS_DIR = docs/benchmark/v2/results
+RESULTS_DIR = results
 
 # Algorithm selection state file
 ALG_STATE_FILE = .alg_state
@@ -57,7 +57,7 @@ breaking:
 	@echo "================================================================"
 	@echo "Patching source code to use Breaking algorithm..."
 	cd $(NS3_DIR) && sed -i 's/m_useBmssp(false)/m_useBmssp(true)/g' src/internet/model/global-route-manager-impl.cc
-	cd $(NS3_DIR) && for f in scratch/test-*.cc; do sed -i 's/result\.algorithm = "Dijkstra"/result.algorithm = "Breaking"/g' $$f; done
+	cd $(NS3_DIR) && for f in scratch/test-*.cc; do sed -i 's/"Algorithm"/"Breaking"/g' $$f; done
 	@echo "Building..."
 	cd $(NS3_DIR) && ./ns3 build -j 10
 	@echo "breaking" > $(ALG_STATE_FILE)
@@ -70,7 +70,7 @@ dijkstra:
 	@echo "================================================================"
 	@echo "Patching source code to use Dijkstra algorithm..."
 	cd $(NS3_DIR) && sed -i 's/m_useBmssp(true)/m_useBmssp(false)/g' src/internet/model/global-route-manager-impl.cc
-	cd $(NS3_DIR) && for f in scratch/test-*.cc; do sed -i 's/result\.algorithm = "Breaking"/result.algorithm = "Dijkstra"/g' $$f; done
+	cd $(NS3_DIR) && for f in scratch/test-*.cc; do sed -i 's/"Algorithm"/"Dijkstra"/g' $$f; done
 	@echo "Building..."
 	cd $(NS3_DIR) && ./ns3 build -j 10
 	@echo "dijkstra" > $(ALG_STATE_FILE)
@@ -103,7 +103,7 @@ test-correctness: setup-results
 	@echo "================================================================"
 	@echo "Running Correctness Tests (Experiment 1)"
 	@echo "================================================================"
-	@cd $(NS3_DIR) && ./ns3 run --no-build test-correctness 2>/dev/null
+	@cd $(NS3_DIR) && ./ns3 run --no-build test-correctness
 	@if [ -f $(NS3_DIR)/test-correctness-results.csv ]; then \
 		ALG=$$(head -1 $(NS3_DIR)/test-correctness-results.csv | grep -oP '(?<=Algorithm:)[^,]*' | head -1); \
 		if [ -z "$$ALG" ]; then ALG="$(CURRENT_ALG)"; fi; \
@@ -116,7 +116,7 @@ test-scalability: setup-results
 	@echo "================================================================"
 	@echo "Running Scalability Tests (Experiment 2)"
 	@echo "================================================================"
-	@cd $(NS3_DIR) && ./ns3 run --no-build test-scalability 2>/dev/null
+	@cd $(NS3_DIR) && ./ns3 run --no-build test-scalability
 	@if [ -f $(NS3_DIR)/test-scalability-results.csv ]; then \
 		ALG=$$(head -1 $(NS3_DIR)/test-scalability-results.csv | grep -oP '(?<=Algorithm:)[^,]*' | head -1); \
 		if [ -z "$$ALG" ]; then ALG="$(CURRENT_ALG)"; fi; \
@@ -129,7 +129,7 @@ test-density: setup-results
 	@echo "================================================================"
 	@echo "Running Density Tests (Experiment 3)"
 	@echo "================================================================"
-	@cd $(NS3_DIR) && ./ns3 run --no-build test-density 2>/dev/null
+	@cd $(NS3_DIR) && ./ns3 run --no-build test-density
 	@if [ -f $(NS3_DIR)/test-density-results.csv ]; then \
 		ALG=$$(head -1 $(NS3_DIR)/test-density-results.csv | grep -oP '(?<=Algorithm:)[^,]*' | head -1); \
 		if [ -z "$$ALG" ]; then ALG="$(CURRENT_ALG)"; fi; \
@@ -142,7 +142,7 @@ test-topology: setup-results
 	@echo "================================================================"
 	@echo "Running Topology Tests (Experiment 4)"
 	@echo "================================================================"
-	@cd $(NS3_DIR) && ./ns3 run --no-build test-topology 2>/dev/null
+	@cd $(NS3_DIR) && ./ns3 run --no-build test-topology
 	@if [ -f $(NS3_DIR)/test-topology-results.csv ]; then \
 		ALG=$$(head -1 $(NS3_DIR)/test-topology-results.csv | grep -oP '(?<=Algorithm:)[^,]*' | head -1); \
 		if [ -z "$$ALG" ]; then ALG="$(CURRENT_ALG)"; fi; \
@@ -155,7 +155,7 @@ test-realistic: setup-results
 	@echo "================================================================"
 	@echo "Running Realistic Scenario Tests (Experiment 5)"
 	@echo "================================================================"
-	@cd $(NS3_DIR) && ./ns3 run --no-build test-realistic 2>/dev/null
+	@cd $(NS3_DIR) && ./ns3 run --no-build test-realistic
 	@if [ -f $(NS3_DIR)/test-realistic-results.csv ]; then \
 		ALG=$$(head -1 $(NS3_DIR)/test-realistic-results.csv | grep -oP '(?<=Algorithm:)[^,]*' | head -1); \
 		if [ -z "$$ALG" ]; then ALG="$(CURRENT_ALG)"; fi; \
@@ -190,7 +190,7 @@ test-large-scale-quick: setup-results
 	@echo "================================================================"
 	@echo "Test scope: 625-1225 nodes (estimated time: 3-5 minutes)"
 	@echo "================================================================"
-	@cd $(NS3_DIR) && ./ns3 run --no-build "test-large-scale --quick" 2>/dev/null
+	@cd $(NS3_DIR) && ./ns3 run --no-build "test-large-scale --quick"
 	@if [ -f $(NS3_DIR)/test-large-scale-results.csv ]; then \
 		ALG=$$(head -1 $(NS3_DIR)/test-large-scale-results.csv | grep -oP '(?<=Algorithm:)[^,]*' | head -1); \
 		if [ -z "$$ALG" ]; then ALG="$(CURRENT_ALG)"; fi; \
@@ -211,7 +211,7 @@ test-large-scale: setup-results
 	@echo "================================================================"
 	@echo "Running Large-Scale Tests (Full Scale)"
 	@echo "================================================================"
-	@cd $(NS3_DIR) && ./ns3 run --no-build "test-large-scale" 2>/dev/null
+	@cd $(NS3_DIR) && ./ns3 run --no-build "test-large-scale"
 	@if [ -f $(NS3_DIR)/test-large-scale-results.csv ]; then \
 		ALG=$$(head -1 $(NS3_DIR)/test-large-scale-results.csv | grep -oP '(?<=Algorithm:)[^,]*' | head -1); \
 		if [ -z "$$ALG" ]; then ALG="$(CURRENT_ALG)"; fi; \
